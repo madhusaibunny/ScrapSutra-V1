@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: scrapsutra-v1
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: FLASK_DEBUG
+        value: False
+      - key: PYTHON_VERSION
+        value: 3.10.11
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false

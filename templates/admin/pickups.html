@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="glass-card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h2 class="text-success fw-bold m-0">Pickup Requests</h2>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary rounded-pill"><i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard</a>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table table-glass align-middle">
+            <thead>
+                <tr>
+                    <th>Req ID</th>
+                    <th>User ID</th>
+                    <th>Date & Time</th>
+                    <th>Address</th>
+                    <th>Status</th>
+                    <th>Requested On</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pickups %}
+                <tr>
+                    <td class="text-muted">#{{ p.id }}</td>
+                    <td><span class="badge bg-secondary">User #{{ p.user_id }}</span></td>
+                    <td>
+                        <div class="fw-bold">{{ p.pickup_date }}</div>
+                        <div class="text-muted small">{{ p.time_slot }}</div>
+                    </td>
+                    <td style="max-width: 250px;" class="text-truncate" title="{{ p.address }}">{{ p.address }}</td>
+                    <td>
+                        <span class="badge badge-custom 
+                            {% if p.status == 'pending' %}bg-pending
+                            {% else %}bg-approved{% endif %}">
+                            {{ p.status|title }}
+                        </span>
+                    </td>
+                    <td class="text-muted small">{{ p.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        {% if p.status == 'pending' %}
+                        <form action="{{ url_for('admin.approve_pickup', id=p.id) }}" method="POST" class="m-0">
+                            <button type="submit" class="btn btn-sm btn-primary-custom rounded-pill"><i class="fa-solid fa-check me-1"></i> Dispatch</button>
+                        </form>
+                        {% else %}
+                        <span class="text-success fw-bold"><i class="fa-solid fa-truck-fast me-1"></i> Dispatched</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

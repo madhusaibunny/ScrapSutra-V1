@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="glass-card mx-auto" style="max-width: 450px; margin-top: 3rem;">
+    <h2 class="text-center text-success mb-4 fw-bold">Create Account</h2>
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label text-light">Name</label>
+            <input type="text" name="name" class="form-control form-control-glass" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-light">Email</label>
+            <input type="email" name="email" class="form-control form-control-glass" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label text-light">Phone Number</label>
+            <input type="tel" name="phone" class="form-control form-control-glass">
+        </div>
+        <div class="mb-4">
+            <label class="form-label text-light">Password</label>
+            <input type="password" name="password" class="form-control form-control-glass" required>
+        </div>
+        <button type="submit" class="btn btn-primary-custom w-100 py-2 fs-5">Sign Up</button>
+    </form>
+    
+    <div class="text-center text-muted my-4">or</div>
+
+    <button type="button" id="googleLoginBtn" class="btn btn-light w-100 py-2 d-flex align-items-center justify-content-center text-secondary border">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 18px; height: 18px;" class="me-2" alt="Google Logo">
+        Sign Up with Google
+    </button>
+
+    <p class="mt-4 text-center text-light">
+        Already have an account? <a href="{{ url_for('auth.login') }}" class="text-success text-decoration-none fw-bold">Login</a>
+    </p>
+</div>
+
+<!-- Firebase Auth Module -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyAdHSOH10xfDl9ME7ZNE6t7_v3GYyUNMy0",
+        authDomain: "scarpsutra.firebaseapp.com",
+        projectId: "scarpsutra",
+        storageBucket: "scarpsutra.firebasestorage.app",
+        messagingSenderId: "32623565806",
+        appId: "1:32623565806:web:7ae78501b71bd8dcd28cff"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+        try {
+            const btn = document.getElementById('googleLoginBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Connecting...';
+
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+
+            const userRef = doc(db, 'users', user.uid);
+            const userSnap = await getDoc(userRef);
+
+            if (!userSnap.exists()) {
+                await setDoc(userRef, {
+                    name: user.displayName || "Google User",
+                    email: user.email,
+                    points: 0,
+                    role: "user",
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            const idToken = await user.getIdToken();
+
+            const response = await fetch('/auth/google-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id_token: idToken })
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                window.location.href = data.redirect || '/user/dashboard';
+            } else {
+                alert("Login failed on server: " + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error(error);
+            if (error.code !== 'auth/popup-closed-by-user') {
+                alert("Google Sign-Up Error: " + error.message);
+            }
+        } finally {
+            const btn = document.getElementById('googleLoginBtn');
+            btn.disabled = false;
+            btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" style="width: 18px; height: 18px;" class="me-2" alt="Google Logo"> Sign Up with Google';
+        }
+    });
+</script>
+{% endblock %}

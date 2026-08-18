@@ -1,0 +1,33 @@
+# Environments
+venv/
+venv - Copy/
+env/
+.env
+
+# Secrets
+*.pem
+*.key
+.env.*
+secrets.json
+
+# Database
+*.db
+*.sqlite3
+instance/
+
+# Python
+__pycache__/
+__pycache__ - Copy*/
+*.py[cod]
+*$py.class
+
+# Copies
+* - Copy*
+
+# Node
+node_modules/
+node_backend/node_modules/
+
+# OS specific
+.DS_Store
+Thumbs.db

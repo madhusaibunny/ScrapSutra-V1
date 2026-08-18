@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="glass-card p-4">
+    <h2 class="text-success fw-bold mb-4">Admin Dashboard</h2>
+    <div class="row g-4">
+        <div class="col-12 col-md-4">
+            <div class="p-4 rounded-4 text-center border border-primary border-opacity-25" style="background: rgba(13, 110, 253, 0.1);">
+                <i class="fa-solid fa-users display-4 text-primary mb-3"></i>
+                <h1 class="display-5 fw-bold text-primary mb-0">{{ total_users }}</h1>
+                <p class="text-light opacity-75 mt-2">Total Users</p>
+                <a href="{{ url_for('admin.users') }}" class="btn btn-outline-primary mt-2 w-100 rounded-pill">Manage Users</a>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="p-4 rounded-4 text-center border border-success border-opacity-25" style="background: rgba(25, 135, 84, 0.1);">
+                <i class="fa-solid fa-camera display-4 text-success mb-3"></i>
+                <h1 class="display-5 fw-bold text-success mb-0">{{ total_scrap }}</h1>
+                <p class="text-light opacity-75 mt-2">Scrap Scans</p>
+                <a href="{{ url_for('admin.scraps') }}" class="btn btn-outline-success mt-2 w-100 rounded-pill">Verify Scraps</a>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="p-4 rounded-4 text-center border border-warning border-opacity-25" style="background: rgba(255, 193, 7, 0.1);">
+                <i class="fa-solid fa-truck display-4 text-warning mb-3"></i>
+                <h1 class="display-5 fw-bold text-warning mb-0">{{ total_pickups }}</h1>
+                <p class="text-light opacity-75 mt-2">Pickups</p>
+                <a href="{{ url_for('admin.pickups') }}" class="btn btn-outline-warning mt-2 w-100 rounded-pill">Schedule Pickups</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card p-4 mt-4">
+    <h4 class="fw-bold mb-4">Recent Joiners</h4>
+    <div class="table-responsive">
+        <table class="table table-glass align-middle">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Joined</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in recent_users %}
+                <tr>
+                    <td class="text-muted">#{{ u.id }}</td>
+                    <td class="fw-bold">{{ u.name }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>
+                        <span class="badge badge-custom 
+                            {% if u.role == 'admin' %}bg-rejected
+                            {% else %}bg-approved{% endif %}">
+                            {{ u.role|title }}
+                        </span>
+                    </td>
+                    <td class="text-muted">{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

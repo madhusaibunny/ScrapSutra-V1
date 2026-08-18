@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+    <div class="col-12 col-lg-7">
+        <div class="glass-card p-4 h-100">
+            <h3 class="text-success fw-bold mb-4"><i class="fa-solid fa-truck me-2"></i> Schedule Pickup</h3>
+            <form method="POST">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-light">Date</label>
+                        <input type="date" name="date" class="form-control form-control-glass" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-light">Time Slot</label>
+                        <select name="time" class="form-select form-select-glass" required>
+                            <option value="Morning (9 AM - 12 PM)">Morning (9 AM - 12 PM)</option>
+                            <option value="Afternoon (12 PM - 4 PM)">Afternoon (12 PM - 4 PM)</option>
+                            <option value="Evening (4 PM - 7 PM)">Evening (4 PM - 7 PM)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label text-light d-flex justify-content-between">
+                        <span>Pickup Address & Location</span>
+                        <span class="text-muted small">Drag pin to auto-fill</span>
+                    </label>
+                    <div id="map" class="rounded-3 border border-secondary border-opacity-25 mb-3" style="height: 300px; width: 100%; z-index: 1;"></div>
+                    <textarea id="addressInput" name="address" rows="3" class="form-control form-control-glass" required placeholder="Drag the map pin, or type your address here..."></textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-custom w-100 py-3 fs-5 rounded-3">Schedule Pickup</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Leaflet Maps CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map = L.map('map').setView([20.0, 0.0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        let marker = L.marker([20.0, 0.0], {draggable: true}).addTo(map);
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                let lat = position.coords.latitude;
+                let lon = position.coords.longitude;
+                map.setView([lat, lon], 15);
+                marker.setLatLng([lat, lon]);
+                updateAddress(lat, lon);
+            });
+        }
+
+        marker.on('dragend', function(e) {
+            let position = marker.getLatLng();
+            updateAddress(position.lat, position.lng);
+        });
+
+        map.on('click', function(e) {
+            marker.setLatLng(e.latlng);
+            updateAddress(e.latlng.lat, e.latlng.lng);
+        });
+
+        function updateAddress(lat, lon) {
+            document.getElementById('addressInput').placeholder = "Locating...";
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
+                .then(response => response.json())
+                .then(data => {
+                    if(data && data.display_name) {
+                        document.getElementById('addressInput').value = data.display_name;
+                    }
+                })
+                .catch(err => {
+                    console.error("Geocoding API missing", err);
+                    document.getElementById('addressInput').placeholder = "Type your address manually...";
+                });
+        }
+    </script>
+    
+    <div class="col-12 col-lg-5">
+        <div class="glass-card p-4 h-100">
+            <h4 class="fw-bold mb-4">My Pickup Requests</h4>
+            {% if pickups %}
+            <div class="list-group list-group-flush bg-transparent">
+                {% for p in pickups %}
+                <div class="list-group-item bg-transparent border-secondary border-opacity-25 px-0 py-3 text-light">
+                    <div class="d-flex w-100 justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0 fw-bold"><i class="fa-regular fa-calendar text-success me-2"></i>{{ p.pickup_date }}</h6>
+                        <span class="badge badge-custom 
+                            {% if p.status == 'pending' %}bg-pending
+                            {% else %}bg-approved{% endif %}">
+                            {{ p.status|title }}
+                        </span>
+                    </div>
+                    <p class="mb-1 text-muted"><i class="fa-regular fa-clock me-2"></i>{{ p.time_slot }}</p>
+                    <small class="text-muted"><i class="fa-solid fa-location-dot me-2"></i>{{ p.address }}</small>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5 mt-4">
+                <i class="fa-solid fa-truck display-1 text-muted opacity-25 mb-3"></i>
+                <p class="text-light opacity-75">No pickup requests yet. Schedule one when you have enough scrap!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

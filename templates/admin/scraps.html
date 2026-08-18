@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="glass-card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h2 class="text-success fw-bold m-0">Scrap Verification & Approval</h2>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary rounded-pill"><i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard</a>
+    </div>
+    
+    <div class="mt-4">
+        {% for s in scraps %}
+        <div class="card bg-dark bg-opacity-25 border-secondary border-opacity-25 rounded-4 mb-4 overflow-hidden shadow-sm">
+            <div class="row g-0">
+                <div class="col-md-4 position-relative bg-dark d-flex align-items-center justify-content-center p-3 border-end border-secondary border-opacity-25">
+                    <img src="{{ url_for('static', filename='uploads/' + s.image_url) }}" 
+                         onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?auto=format&fit=crop&q=80';" 
+                         class="img-fluid rounded shadow-lg object-fit-cover w-100" style="max-height: 250px;" alt="Scrap Request">
+                </div>
+                
+                <div class="col-md-8 p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <h4 class="fw-bold m-0">Upload #{{ s.id }} <span class="badge bg-secondary ms-2 fs-6">User #{{ s.user_id }}</span></h4>
+                        <span class="badge badge-custom 
+                            {% if s.status == 'approved' %}bg-approved
+                            {% elif s.status == 'rejected' %}bg-rejected
+                            {% else %}bg-pending{% endif %}">
+                            {{ s.status|title }}
+                        </span>
+                    </div>
+                    
+                    <div class="row g-3 mb-3 text-light opacity-75">
+                        <div class="col-sm-6">
+                            <strong>Submitted Category:</strong><br>
+                            <span class="fs-5 text-white">{{ s.scrap_type|title }}</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>AI Detected:</strong><br>
+                            <span class="fs-5 text-white">{{ s.detected_type|title }}</span>
+                            <span class="text-muted small ms-2">({{ (s.confidence_score * 100)|round(1) }}% match)</span>
+                        </div>
+                        <div class="col-12">
+                            <strong>AI Labels:</strong><br>
+                            <span class="text-muted fst-italic">{{ s.detected_labels }}</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Estimated Rate:</strong><br>
+                            <span class="text-success fw-bold">₹{{ s.estimated_price }}/kg</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Submitted On:</strong><br>
+                            <span class="text-muted">{{ s.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</span>
+                        </div>
+                    </div>
+                    
+                    {% if s.status == 'pending' %}
+                    <hr class="border-secondary opacity-25 my-4">
+                    <form action="{{ url_for('admin.approve_scrap', id=s.id) }}" method="POST" class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label text-light fw-medium mb-1">Verified Weight (kg)</label>
+                            <input type="number" step="0.01" name="weight" value="0.0" min="0.01" class="form-control form-control-glass border-success border-opacity-50" required>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" name="action" value="approve" class="btn btn-success w-100 rounded-3"><i class="fa-solid fa-check me-2"></i> Approve & Pay</button>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" name="action" value="reject" class="btn btn-outline-danger w-100 rounded-3" formnovalidate><i class="fa-solid fa-times me-2"></i> Reject</button>
+                        </div>
+                    </form>
+                    {% elif s.status == 'approved' %}
+                    <div class="alert alert-success d-flex align-items-center mb-0 mt-3 py-2 border-0 bg-success bg-opacity-10 text-success">
+                        <i class="fa-solid fa-circle-check fs-4 me-3"></i>
+                        <div>
+                            <strong>Verified Weight:</strong> {{ s.weight }} kg <span class="mx-2">|</span> 
+                            <strong>Points Issued:</strong> {{ s.points_earned }} pts
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fa-solid fa-clipboard-check display-1 text-muted opacity-25 mb-3"></i>
+            <p class="text-light opacity-75 fs-5">No scrap submissions to verify.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
