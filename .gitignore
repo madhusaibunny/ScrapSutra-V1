@@ -3,6 +3,8 @@ venv/
 venv - Copy/
 env/
 .env
+.env.local
+.env.*.local
 
 # Secrets
 *.pem
@@ -31,3 +33,17 @@ node_backend/node_modules/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Uploads (can be large)
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Render
+.render/

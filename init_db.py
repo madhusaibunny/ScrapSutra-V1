@@ -6,10 +6,9 @@ from werkzeug.security import generate_password_hash
 app = create_app()
 
 with app.app_context():
-    print("Dropping all tables...")
-    db.drop_all()
     print("Creating all tables...")
     db.create_all()
+    print("Tables created successfully.")
     
     # Check if admin exists
     admin = User.query.filter_by(email="admin@scrapsutra.com").first()
@@ -24,8 +23,10 @@ with app.app_context():
         )
         db.session.add(admin)
         db.session.commit()
-        print("Admin user created successfully (email: admin@scrapsutra.com, password: admin123).")
+        print("Admin user created successfully.")
+        print("⚠️  DEFAULT CREDENTIALS: Email: admin@scrapsutra.com | Password: admin123")
+        print("⚠️  CHANGE THE ADMIN PASSWORD AFTER FIRST LOGIN!")
     else:
-        print("Admin already exists.")
+        print("Admin user already exists.")
 
-    print("Database reset complete.")
+    print("Database initialization complete.")
