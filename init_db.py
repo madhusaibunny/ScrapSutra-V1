@@ -1,32 +1,50 @@
 import os
-from app import create_app, db
-from database.models import User
+from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
-app = create_app()
+load_dotenv()
 
-with app.app_context():
-    print("Creating all tables...")
-    db.create_all()
-    print("Tables created successfully.")
-    
-    # Check if admin exists
-    admin = User.query.filter_by(email="admin@scrapsutra.com").first()
-    if not admin:
-        print("Creating admin user...")
-        admin = User(
-            name="Admin User",
-            email="admin@scrapsutra.com",
-            phone="0000000000",
-            password=generate_password_hash("admin123", method="pbkdf2:sha256"),
-            role="admin"
-        )
-        db.session.add(admin)
-        db.session.commit()
-        print("Admin user created successfully.")
-        print("⚠️  DEFAULT CREDENTIALS: Email: admin@scrapsutra.com | Password: admin123")
-        print("⚠️  CHANGE THE ADMIN PASSWORD AFTER FIRST LOGIN!")
-    else:
-        print("Admin user already exists.")
+from app import app
+from database.models import db, User
 
-    print("Database initialization complete.")
+
+def initialize_database():
+    with app.app_context():
+        db.create_all()
+
+        admin_email = os.environ.get("ADMIN_EMAIL")
+        admin_password = os.environ.get("ADMIN_PASSWORD")
+
+        if not admin_email or not admin_password:
+            print("ERROR: ADMIN_EMAIL or ADMIN_PASSWORD is missing in .env")
+            return
+
+        admin_email = admin_email.strip().lower()
+
+        admin = User.query.filter_by(email=admin_email).first()
+
+        if admin:
+            admin.role = "admin"
+            db.session.commit()
+            print("Admin already exists. Admin role updated!")
+            print(f"Email: {admin_email}")
+
+        else:
+            admin = User(
+                name="ScrapSutra Admin",
+                email=admin_email,
+                phone="0000000000",
+                password=generate_password_hash(admin_password),
+                role="admin",
+                eco_score=0
+            )
+
+            db.session.add(admin)
+            db.session.commit()
+
+            print("Admin created successfully!")
+            print(f"Email: {admin_email}")
+
+
+if __name__ == "__main__":
+    initialize_database()

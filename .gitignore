@@ -47,3 +47,11 @@ static/uploads/*
 
 # Render
 .render/
+.env
+.env.*
+__pycache__/
+*.pyc
+static/uploads/
+firebase-key.json
+*.db
+instance/
