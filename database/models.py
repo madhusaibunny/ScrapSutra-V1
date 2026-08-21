@@ -33,7 +33,7 @@ class PickupRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     pickup_date = db.Column(db.String(20), nullable=False)
-    time_slot = db.Column(db.String(20), nullable=False)
+    time_slot = db.Column(db.String(100), nullable=False)
     address = db.Column(db.Text, nullable=False)
     latitude = db.Column(db.String(50))
     longitude = db.Column(db.String(50))
