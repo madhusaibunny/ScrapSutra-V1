@@ -1,266 +1,6 @@
-{% extends 'base.html' %}
-
-{% block content %}
-
-<div class="row g-4 mb-4">
-
-    <!-- Welcome & Wallet -->
-    <div class="col-12 col-lg-7">
-        <div class="glass-card h-100 p-4">
-
-            <h3 class="fw-bold mb-4">
-                Welcome, {{ current_user.name }}!
-            </h3>
-
-            <div class="d-flex flex-wrap gap-4 p-4 rounded-4 bg-dark bg-opacity-25 border border-secondary border-opacity-25 mb-4">
-
-                <div class="flex-grow-1">
-                    <p class="text-muted mb-1 fs-6">
-                        Total Wallet Amount
-                    </p>
-
-                    <div class="fs-1 fw-bold text-success">
-                        <i class="fa-solid fa-indian-rupee-sign fs-4 align-middle pb-1"></i>
-                        {{ current_user.eco_score or 0 }}
-                    </div>
-                </div>
-
-                <div class="border-start border-secondary border-opacity-50 ps-4 flex-grow-1">
-                    <p class="text-muted mb-1 fs-6">
-                        Eco Points MTD
-                    </p>
-
-                    <div class="fs-1 fw-bold text-success">
-                        {{ total_points or 0 }}
-                    </div>
-                </div>
-
-            </div>
-
-            <div class="d-flex flex-wrap gap-3">
-
-                <a href="{{ url_for('user.upload_scrap') }}"
-                   class="btn btn-primary-custom flex-grow-1 py-3">
-
-                    <i class="fa-solid fa-camera me-2"></i>
-                    Scan Real Scrap
-
-                </a>
-
-                <a href="{{ url_for('user.pickup') }}"
-                   class="btn btn-outline-success flex-grow-1 py-3">
-
-                    <i class="fa-solid fa-truck me-2"></i>
-                    Request Pickup
-
-                </a>
-
-            </div>
-
-        </div>
-    </div>
-
-
-    <!-- Scrap Statistics -->
-    <div class="col-12 col-lg-5">
-
-        <div class="glass-card h-100 p-4 d-flex justify-content-around align-items-center text-center">
-
-            <div>
-                <div class="display-3 fw-bold text-warning">
-                    {{ pending_count or 0 }}
-                </div>
-
-                <p class="text-light opacity-75 mt-2 mb-0">
-                    Pending Scraps
-                </p>
-            </div>
-
-
-            <div>
-                <div class="display-3 fw-bold text-success">
-                    {{ approved_count or 0 }}
-                </div>
-
-                <p class="text-light opacity-75 mt-2 mb-0">
-                    Approved Scraps
-                </p>
-            </div>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-<!-- Recent Scrap Submissions -->
-
-<div class="glass-card p-4">
-
-    <h3 class="fw-bold mb-4">
-        Recent Scrap Submissions
-    </h3>
-
-
-    {% if scraps %}
-
-    <div class="table-responsive">
-
-        <table class="table table-glass align-middle">
-
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Est. Price/kg</th>
-                    <th>Confidence</th>
-                    <th>Status</th>
-                    <th>Points / Weight</th>
-                </tr>
-            </thead>
-
-
-            <tbody>
-
-                {% for scrap in scraps %}
-
-                <tr>
-
-                    <td>
-                        {% if scrap.created_at %}
-                            {{ scrap.created_at.strftime('%Y-%m-%d %H:%M') }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
-
-
-                    <td class="fw-medium">
-                        {{ scrap.scrap_type|title }}
-                    </td>
-
-
-                    <td>
-                        ₹{{ (scrap.estimated_price or 0)|round(2) }}
-                    </td>
-
-
-                    <!-- Confidence -->
-                    <td>
-
-                        {% set confidence = scrap.confidence_score or 0 %}
-                        {% set confidence_percent = (confidence * 100)|round(1) %}
-
-                        <div class="d-flex align-items-center gap-2">
-
-                            <span>
-                                {{ confidence_percent }}%
-                            </span>
-
-                            <div class="progress"
-                                 style="width: 50px; height: 6px; background-color: rgba(255,255,255,0.1);">
-
-                                <div class="progress-bar bg-success"
-                                     data-confidence="{{ confidence_percent }}">
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    </td>
-
-
-                    <!-- Status -->
-                    <td>
-
-                        {% if scrap.status == 'approved' %}
-
-                            <span class="badge badge-custom bg-approved">
-                                Approved
-                            </span>
-
-                        {% elif scrap.status == 'rejected' %}
-
-                            <span class="badge badge-custom bg-rejected">
-                                Rejected
-                            </span>
-
-                        {% else %}
-
-                            <span class="badge badge-custom bg-pending">
-                                Pending
-                            </span>
-
-                        {% endif %}
-
-                    </td>
-
-
-                    <!-- Points -->
-                    <td>
-
-                        {% if scrap.status == 'approved' %}
-
-                            <span class="text-success fw-bold">
-                                {{ scrap.points_earned or 0 }} pts
-                            </span>
-
-                            <span class="text-muted small">
-                                ({{ scrap.weight or 0 }} kg)
-                            </span>
-
-                        {% else %}
-
-                            <span class="text-muted">
-                                -
-                            </span>
-
-                        {% endif %}
-
-                    </td>
-
-                </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-
-    {% else %}
-
-    <div class="text-center py-5">
-
-        <i class="fa-solid fa-camera display-1 text-muted opacity-25 mb-3"></i>
-
-        <p class="text-light opacity-75 fs-5">
-            You haven't submitted any scrap yet.
-        </p>
-
-        <a href="{{ url_for('user.upload_scrap') }}"
-           class="btn btn-outline-success mt-2">
-
-            Upload your first scrap to earn points!
-
-        </a>
-
-    </div>
-
-    {% endif %}
-
-</div>
-
-
 <!-- Notification Popup -->
 
-{% if notifications and notifications|length > 0 %}
-
-{% set notification = notifications[0] %}
+{% if notification %}
 
 <div class="modal fade"
      id="notificationModal"
@@ -271,28 +11,33 @@
 
         <div class="modal-content bg-dark text-light border border-secondary">
 
+            <!-- Header -->
+
             <div class="modal-header border-secondary">
 
                 <h5 class="modal-title fw-bold">
 
                     <i class="fa-solid fa-bell text-success me-2"></i>
 
-                    ScrapSutra Notification
+                    {{ notification.title }}
 
                 </h5>
 
-                <button type="button"
-                        class="btn-close btn-close-white"
-                        data-bs-dismiss="modal"
-                        aria-label="Close">
+                <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close">
                 </button>
 
             </div>
 
 
+            <!-- Body -->
+
             <div class="modal-body text-center py-4">
 
-                {% if notification.type == 'error' %}
+                {% if notification.status == 'error' %}
 
                     <i class="fa-solid fa-circle-xmark text-danger display-4 mb-3"></i>
 
@@ -304,22 +49,29 @@
 
 
                 <h4 class="fw-bold">
+
                     {{ notification.title }}
+
                 </h4>
 
 
                 <p class="text-muted mb-0">
+
                     {{ notification.message }}
+
                 </p>
 
             </div>
 
 
+            <!-- Footer -->
+
             <div class="modal-footer border-secondary">
 
-                <button type="button"
-                        class="btn btn-primary-custom w-100"
-                        data-bs-dismiss="modal">
+                <button
+                    type="button"
+                    class="btn btn-primary-custom w-100"
+                    data-bs-dismiss="modal">
 
                     Okay
 
@@ -336,35 +88,59 @@
 
 <script>
 
-// Set progress bar widths
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
 
-    const progressBars = document.querySelectorAll('.progress-bar[data-confidence]');
+        // Set progress bar widths
 
-    progressBars.forEach(function(bar) {
-        const confidence = parseFloat(bar.getAttribute('data-confidence'));
-        bar.style.width = confidence + '%';
-    });
+        const progressBars =
+            document.querySelectorAll(
+                '.progress-bar[data-confidence]'
+            );
 
-    const notificationElement =
-        document.getElementById("notificationModal");
+        progressBars.forEach(
+            function (bar) {
 
-    if (
-        notificationElement &&
-        typeof bootstrap !== "undefined"
-    ) {
+                const confidence =
+                    parseFloat(
+                        bar.getAttribute(
+                            'data-confidence'
+                        )
+                    );
 
-        const notificationModal =
-            new bootstrap.Modal(notificationElement);
+                bar.style.width =
+                    confidence + '%';
 
-        notificationModal.show();
+            }
+        );
+
+
+        // Show notification popup
+
+        const notificationElement =
+            document.getElementById(
+                "notificationModal"
+            );
+
+
+        if (
+            notificationElement &&
+            typeof bootstrap !== "undefined"
+        ) {
+
+            const notificationModal =
+                new bootstrap.Modal(
+                    notificationElement
+                );
+
+            notificationModal.show();
+
+        }
 
     }
-
-});
+);
 
 </script>
 
 {% endif %}
-
-{% endblock %}
