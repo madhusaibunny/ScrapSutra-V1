@@ -150,18 +150,19 @@
                     <td>
 
                         {% set confidence = scrap.confidence_score or 0 %}
+                        {% set confidence_percent = (confidence * 100)|round(1) %}
 
                         <div class="d-flex align-items-center gap-2">
 
                             <span>
-                                {{ (confidence * 100)|round(1) }}%
+                                {{ confidence_percent }}%
                             </span>
 
                             <div class="progress"
                                  style="width: 50px; height: 6px; background-color: rgba(255,255,255,0.1);">
 
                                 <div class="progress-bar bg-success"
-                                     style="width: {{ confidence * 100 }}%;">
+                                     style="width: {{ confidence_percent }}%;">
                                 </div>
 
                             </div>
