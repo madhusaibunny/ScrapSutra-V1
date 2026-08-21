@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+
 from werkzeug.utils import secure_filename
 
 from flask import (
@@ -61,21 +62,12 @@ def allowed_file(filename):
 @login_required
 def dashboard():
 
-    # -----------------------------------------------------
-    # GET USER SCRAPS
-    # -----------------------------------------------------
-
     scraps = (
         ScrapUpload.query
         .filter_by(user_id=current_user.id)
         .order_by(ScrapUpload.created_at.desc())
         .all()
     )
-
-
-    # -----------------------------------------------------
-    # DASHBOARD COUNTS
-    # -----------------------------------------------------
 
     pending_count = sum(
         1
@@ -89,24 +81,13 @@ def dashboard():
         if scrap.status == "approved"
     )
 
-
-    # -----------------------------------------------------
-    # TOTAL ECO POINTS
-    # -----------------------------------------------------
-
     total_points = sum(
         scrap.points_earned or 0
         for scrap in scraps
         if scrap.status == "approved"
     )
 
-
-    # -----------------------------------------------------
-    # DEFAULT NOTIFICATION
-    # -----------------------------------------------------
-
     notification = None
-
 
     # =====================================================
     # CHECK SCRAP NOTIFICATION
@@ -117,16 +98,11 @@ def dashboard():
         .filter(
             ScrapUpload.user_id == current_user.id,
             ScrapUpload.notification_seen.is_(False),
-            ScrapUpload.status.in_(
-                ["approved", "rejected"]
-            )
+            ScrapUpload.status.in_(["approved", "rejected"])
         )
-        .order_by(
-            ScrapUpload.created_at.desc()
-        )
+        .order_by(ScrapUpload.created_at.desc())
         .first()
     )
-
 
     if unseen_scrap:
 
@@ -135,11 +111,9 @@ def dashboard():
             notification = {
                 "title": "Scrap Approved! 🎉",
                 "message": (
-                    f"Your {unseen_scrap.scrap_type} "
-                    f"scrap has been approved. "
-                    f"You earned "
-                    f"{unseen_scrap.points_earned or 0} "
-                    f"Eco Points!"
+                    f"Your {unseen_scrap.scrap_type} scrap "
+                    f"has been approved. You earned "
+                    f"{unseen_scrap.points_earned or 0} Eco Points!"
                 ),
                 "status": "success"
             }
@@ -149,40 +123,31 @@ def dashboard():
             notification = {
                 "title": "Scrap Rejected",
                 "message": (
-                    f"Your {unseen_scrap.scrap_type} "
-                    f"scrap request was rejected "
-                    f"by the admin."
+                    f"Your {unseen_scrap.scrap_type} scrap "
+                    f"request was rejected by the admin."
                 ),
                 "status": "error"
             }
 
-
         unseen_scrap.notification_seen = True
-
         db.session.commit()
 
-
-    # =====================================================
-    # CHECK PICKUP NOTIFICATION
-    # =====================================================
-
     else:
+
+        # =================================================
+        # CHECK PICKUP NOTIFICATION
+        # =================================================
 
         unseen_pickup = (
             PickupRequest.query
             .filter(
                 PickupRequest.user_id == current_user.id,
                 PickupRequest.notification_seen.is_(False),
-                PickupRequest.status.in_(
-                    ["approved", "rejected"]
-                )
+                PickupRequest.status.in_(["approved", "rejected"])
             )
-            .order_by(
-                PickupRequest.created_at.desc()
-            )
+            .order_by(PickupRequest.created_at.desc())
             .first()
         )
-
 
         if unseen_pickup:
 
@@ -210,18 +175,11 @@ def dashboard():
                     "status": "error"
                 }
 
-
             unseen_pickup.notification_seen = True
-
             db.session.commit()
 
-
-    # =====================================================
-    # LOAD DASHBOARD
-    # =====================================================
-
     return render_template(
-        "dashboard.html",
+        "user/dashboard.html",
         scraps=scraps,
         pending_count=pending_count,
         approved_count=approved_count,
@@ -231,7 +189,7 @@ def dashboard():
 
 
 # =========================================================
-# UPLOAD SCRAP PAGE
+# UPLOAD SCRAP
 # =========================================================
 
 @user_bp.route(
@@ -244,32 +202,14 @@ def upload_scrap():
     if request.method == "GET":
 
         return render_template(
-            "upload_scrap.html"
+            "user/upload.html"
         )
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # GET IMAGE
-    # -----------------------------------------------------
+    # =====================================================
 
-    if "image" not in request.files:
-
-        flash(
-            "Please select an image.",
-            "danger"
-        )
-
-        return redirect(
-            url_for(
-                "user.upload_scrap"
-            )
-        )
-
-
-    file = request.files["image"]
-
-
-    if file.filename == "":
+    if "scrap_image" not in request.files:
 
         flash(
             "Please select an image.",
@@ -277,30 +217,36 @@ def upload_scrap():
         )
 
         return redirect(
-            url_for(
-                "user.upload_scrap"
-            )
+            url_for("user.upload_scrap")
         )
 
+    file = request.files["scrap_image"]
+
+    if not file or file.filename == "":
+
+        flash(
+            "Please select an image.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("user.upload_scrap")
+        )
 
     if not allowed_file(file.filename):
 
         flash(
-            "Only PNG, JPG, JPEG and WEBP "
-            "images are allowed.",
+            "Only PNG, JPG, JPEG and WEBP images are allowed.",
             "danger"
         )
 
         return redirect(
-            url_for(
-                "user.upload_scrap"
-            )
+            url_for("user.upload_scrap")
         )
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # SAVE IMAGE
-    # -----------------------------------------------------
+    # =====================================================
 
     original_filename = secure_filename(
         file.filename
@@ -313,7 +259,7 @@ def upload_scrap():
 
     upload_folder = current_app.config.get(
         "UPLOAD_FOLDER",
-        "static/uploads"
+        os.path.join("static", "uploads")
     )
 
     os.makedirs(
@@ -328,10 +274,9 @@ def upload_scrap():
 
     file.save(image_path)
 
-
-    # -----------------------------------------------------
-    # DEFAULT AI RESULT
-    # -----------------------------------------------------
+    # =====================================================
+    # DEFAULT DETECTION RESULT
+    # =====================================================
 
     detection_type = "uncertain"
 
@@ -341,6 +286,11 @@ def upload_scrap():
 
     confidence_score = 0.0
 
+    # Manual override from actual template
+    manual_category = request.form.get(
+        "manual_category",
+        ""
+    ).strip()
 
     # =====================================================
     # AI SCRAP DETECTION
@@ -348,95 +298,116 @@ def upload_scrap():
 
     try:
 
-        from models.scrap_detector import (
-            detect_scrap_type
-        )
+        if manual_category:
 
+            detection_type = "single"
 
-        result = detect_scrap_type(
-            image_path
-        )
+            detected_type = manual_category
 
+            confidence_score = 1.0
 
-        if result:
+            materials = [
+                {
+                    "name": manual_category,
+                    "confidence": 1.0
+                }
+            ]
 
-            detection_type = result.get(
-                "detection_type",
-                "uncertain"
+        else:
+
+            from models.scrap_detector import (
+                detect_scrap_type
             )
 
-            materials = result.get(
-                "materials",
-                []
+            result = detect_scrap_type(
+                image_path
             )
 
+            if result:
 
-            if (
-                detection_type == "single"
-                and materials
-            ):
-
-                detected_type = materials[0].get(
-                    "name",
-                    "Other/Unknown"
+                detection_type = result.get(
+                    "detection_type",
+                    "uncertain"
                 )
 
-                confidence_score = float(
-                    materials[0].get(
-                        "confidence",
-                        0
+                materials = result.get(
+                    "materials",
+                    []
+                )
+
+                if (
+                    detection_type == "single"
+                    and materials
+                ):
+
+                    detected_type = materials[0].get(
+                        "name",
+                        "Other/Unknown"
                     )
-                )
 
-
-            elif (
-                detection_type == "mixed"
-                and materials
-            ):
-
-                detected_type = "Mixed Scrap"
-
-                confidence_values = [
-
-                    float(
-                        material.get(
+                    confidence_score = float(
+                        materials[0].get(
                             "confidence",
                             0
                         )
                     )
 
-                    for material
-                    in materials
+                elif (
+                    detection_type == "mixed"
+                    and materials
+                ):
 
-                ]
+                    detected_type = "Mixed Scrap"
 
-                if confidence_values:
+                    confidence_values = [
+                        float(
+                            material.get(
+                                "confidence",
+                                0
+                            )
+                        )
+                        for material in materials
+                    ]
 
-                    confidence_score = (
-                        sum(confidence_values)
-                        / len(confidence_values)
-                    )
+                    if confidence_values:
 
+                        confidence_score = (
+                            sum(confidence_values)
+                            / len(confidence_values)
+                        )
+
+                else:
+
+                    detected_type = "Other/Unknown"
+
+                    confidence_score = 0.0
 
     except Exception as e:
 
         print(
-            f"AI detection failed: {e}"
+            f"AI detection failed: {e}",
+            flush=True
         )
 
+        detection_type = "uncertain"
 
-    # -----------------------------------------------------
-    # DETECTED LABELS
-    # -----------------------------------------------------
+        detected_type = "Other/Unknown"
+
+        confidence_score = 0.0
+
+        materials = []
+
+    # =====================================================
+    # SAVE DETECTED LABELS
+    # =====================================================
 
     detected_labels = json.dumps(
         materials
     )
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # CREATE SCRAP RECORD
-    # -----------------------------------------------------
+    # =====================================================
 
     scrap = ScrapUpload(
 
@@ -463,30 +434,42 @@ def upload_scrap():
         points_earned=0,
 
         notification_seen=True
-
     )
-
 
     db.session.add(scrap)
 
     db.session.commit()
 
+    # =====================================================
+    # SUCCESS MESSAGE
+    # =====================================================
 
-    # -----------------------------------------------------
-    # SHOW RESULT
-    # -----------------------------------------------------
+    if detection_type == "mixed":
 
-    flash(
-        "Scrap uploaded successfully! "
-        "Waiting for admin approval.",
-        "success"
-    )
+        flash(
+            "Mixed scrap detected successfully! "
+            "Your request has been sent for admin review.",
+            "success"
+        )
 
+    elif detection_type == "uncertain":
+
+        flash(
+            "We could not confidently identify the scrap. "
+            "Your image has been sent for admin review.",
+            "warning"
+        )
+
+    else:
+
+        flash(
+            f"{detected_type} detected successfully! "
+            "Waiting for admin approval.",
+            "success"
+        )
 
     return redirect(
-        url_for(
-            "user.dashboard"
-        )
+        url_for("user.dashboard")
     )
 
 
@@ -504,20 +487,20 @@ def pickup():
     if request.method == "GET":
 
         return render_template(
-            "pickup.html"
+            "user/pickup.html"
         )
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # GET FORM DATA
-    # -----------------------------------------------------
+    # Matches templates/user/pickup.html
+    # =====================================================
 
     pickup_date = request.form.get(
-        "pickup_date"
+        "date"
     )
 
     time_slot = request.form.get(
-        "time_slot"
+        "time"
     )
 
     address = request.form.get(
@@ -532,12 +515,15 @@ def pickup():
         "longitude"
     )
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # VALIDATION
-    # -----------------------------------------------------
+    # =====================================================
 
-    if not pickup_date or not time_slot or not address:
+    if (
+        not pickup_date
+        or not time_slot
+        or not address
+    ):
 
         flash(
             "Please fill all required fields.",
@@ -545,15 +531,12 @@ def pickup():
         )
 
         return redirect(
-            url_for(
-                "user.pickup"
-            )
+            url_for("user.pickup")
         )
 
-
-    # -----------------------------------------------------
+    # =====================================================
     # CREATE PICKUP REQUEST
-    # -----------------------------------------------------
+    # =====================================================
 
     pickup_request = PickupRequest(
 
@@ -572,9 +555,7 @@ def pickup():
         status="pending",
 
         notification_seen=True
-
     )
-
 
     db.session.add(
         pickup_request
@@ -582,15 +563,11 @@ def pickup():
 
     db.session.commit()
 
-
     flash(
         "Pickup request submitted successfully!",
         "success"
     )
 
-
     return redirect(
-        url_for(
-            "user.dashboard"
-        )
+        url_for("user.dashboard")
     )
