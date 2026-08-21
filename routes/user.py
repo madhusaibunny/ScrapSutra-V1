@@ -1,13 +1,10 @@
-import os
-import json
-
 from flask import (
     Blueprint,
     render_template,
-    request,
-    flash,
     redirect,
     url_for,
+    flash,
+    request,
     current_app
 )
 
@@ -15,484 +12,479 @@ from flask_login import login_required, current_user
 
 from database.models import (
     db,
+    User,
     ScrapUpload,
-    PickupRequest,
-    Transaction
+    PickupRequest
 )
 
-from werkzeug.utils import secure_filename
-from models.ai_module import detect_scrap_type
+from flask_mail import Message
+import threading
 
 
-user_bp = Blueprint('user', __name__)
+admin_bp = Blueprint('admin', __name__)
 
 
-# ==========================================
-# USER DASHBOARD
-# ==========================================
-@user_bp.route('/dashboard')
+# ==================================================
+# ADMIN PROTECTION
+# ==================================================
+
+@admin_bp.before_request
 @login_required
+def ensure_admin():
+
+    if current_user.role != 'admin':
+
+        flash(
+            'Unauthorized access',
+            'danger'
+        )
+
+        return redirect(
+            url_for('user.dashboard')
+        )
+
+
+# ==================================================
+# ADMIN DASHBOARD
+# ==================================================
+
+@admin_bp.route('/dashboard')
 def dashboard():
 
-    # Get all scrap uploads of current user
-    scraps = (
-        ScrapUpload.query
-        .filter_by(user_id=current_user.id)
-        .order_by(ScrapUpload.created_at.desc())
+    total_users = User.query.count()
+
+    total_pickups = PickupRequest.query.count()
+
+    total_scrap = ScrapUpload.query.count()
+
+    recent_users = (
+        User.query
+        .order_by(User.created_at.desc())
+        .limit(5)
         .all()
     )
 
-    # Dashboard summaries
-    pending = sum(
-        1 for s in scraps
-        if s.status == 'pending'
+    return render_template(
+        'admin/dashboard.html',
+        total_users=total_users,
+        total_pickups=total_pickups,
+        total_scrap=total_scrap,
+        recent_users=recent_users
     )
 
-    approved = sum(
-        1 for s in scraps
-        if s.status == 'approved'
+
+# ==================================================
+# USERS
+# ==================================================
+
+@admin_bp.route('/users')
+def users():
+
+    users_list = User.query.all()
+
+    return render_template(
+        'admin/users.html',
+        users=users_list
     )
 
-    total_points = sum(
-        s.points_earned
-        for s in scraps
-        if s.status == 'approved'
-    )
 
-    # ==========================================
-    # FIND NEW SCRAP NOTIFICATIONS
-    # ==========================================
-    scrap_notifications = (
-        ScrapUpload.query
-        .filter(
-            ScrapUpload.user_id == current_user.id,
-            ScrapUpload.status.in_(['approved', 'rejected']),
-            ScrapUpload.notification_seen == False
-        )
-        .order_by(ScrapUpload.created_at.desc())
-        .all()
-    )
+# ==================================================
+# PICKUPS LIST
+# ==================================================
 
-    # ==========================================
-    # FIND NEW PICKUP NOTIFICATIONS
-    # ==========================================
-    pickup_notifications = (
+@admin_bp.route('/pickups')
+def pickups():
+
+    pickups_list = (
         PickupRequest.query
-        .filter(
-            PickupRequest.user_id == current_user.id,
-            PickupRequest.status.in_(['approved', 'rejected']),
-            PickupRequest.notification_seen == False
-        )
         .order_by(PickupRequest.created_at.desc())
         .all()
     )
 
-    # Combine notifications
-    notifications = []
-
-    # Scrap notifications
-    for scrap in scrap_notifications:
-
-        if scrap.status == 'approved':
-
-            notifications.append({
-                'type': 'success',
-                'title': 'Scrap Approved! 🎉',
-                'message': (
-                    f'Your {scrap.scrap_type.title()} scrap '
-                    f'was approved. '
-                    f'You earned {scrap.points_earned} Eco Points!'
-                )
-            })
-
-        elif scrap.status == 'rejected':
-
-            notifications.append({
-                'type': 'error',
-                'title': 'Scrap Request Rejected',
-                'message': (
-                    f'Your {scrap.scrap_type.title()} scrap '
-                    f'request was rejected by the admin.'
-                )
-            })
-
-        # Mark notification as seen
-        scrap.notification_seen = True
-
-
-    # Pickup notifications
-    for pickup in pickup_notifications:
-
-        if pickup.status == 'approved':
-
-            notifications.append({
-                'type': 'success',
-                'title': 'Pickup Confirmed! 🚚',
-                'message': (
-                    f'Your pickup scheduled for '
-                    f'{pickup.pickup_date} during '
-                    f'{pickup.time_slot} has been approved!'
-                )
-            })
-
-        elif pickup.status == 'rejected':
-
-            notifications.append({
-                'type': 'error',
-                'title': 'Pickup Request Rejected',
-                'message': (
-                    f'Your pickup scheduled for '
-                    f'{pickup.pickup_date} during '
-                    f'{pickup.time_slot} was rejected.'
-                )
-            })
-
-        # Mark notification as seen
-        pickup.notification_seen = True
-
-
-    # Save notification_seen changes
-    if scrap_notifications or pickup_notifications:
-        db.session.commit()
-
-
     return render_template(
-        'user/dashboard.html',
-        scraps=scraps,
-        pending_count=pending,
-        approved_count=approved,
-        total_points=total_points,
-        notifications=notifications
+        'admin/pickups.html',
+        pickups=pickups_list
     )
 
 
-# ==========================================
-# UPLOAD SCRAP
-# ==========================================
-@user_bp.route('/upload-scrap', methods=['GET', 'POST'])
-@login_required
-def upload_scrap():
-
-    if request.method == 'POST':
-
-        # Check image
-        if 'scrap_image' not in request.files:
-            flash('No image provided', 'danger')
-            return redirect(request.url)
-
-        file = request.files['scrap_image']
-
-        manual_category = request.form.get(
-            'manual_category'
-        )
-
-        if file.filename == '':
-            flash('No selected file', 'danger')
-            return redirect(request.url)
-
-        # Allowed image formats
-        allowed_exts = (
-            '.png',
-            '.jpg',
-            '.jpeg',
-            '.webp',
-            '.heic',
-            '.jfif',
-            '.avif',
-            '.gif'
-        )
-
-        if file and file.filename.lower().endswith(
-            allowed_exts
-        ):
-
-            filename = secure_filename(file.filename)
-
-            upload_path = os.path.join(
-                current_app.config.get(
-                    'UPLOAD_FOLDER',
-                    'static/uploads'
-                ),
-                filename
-            )
-
-            os.makedirs(
-                os.path.dirname(upload_path),
-                exist_ok=True
-            )
-
-            file.save(upload_path)
-
-
-            # Default AI result
-            ai_result = {
-                'detection_type': 'uncertain',
-                'materials': [],
-                'confidence': 0,
-                'message': ''
-            }
-
-
-            # Run AI detection only when category
-            # was not manually selected
-            if not manual_category:
-
-                try:
-
-                    ai_result = detect_scrap_type(
-                        upload_path
-                    )
-
-                except Exception as e:
-
-                    print(
-                        f"AI detection error: {e}"
-                    )
-
-                    ai_result = {
-                        'detection_type': 'uncertain',
-                        'materials': [],
-                        'confidence': 0,
-                        'message': str(e)
-                    }
-
-
-            detection_type = ai_result.get(
-                'detection_type',
-                'uncertain'
-            )
-
-
-            if detection_type == 'uncertain':
-
-                ai_category = 'unknown'
-                ai_confidence = 0.0
-                ai_labels = '[]'
-
-
-            elif detection_type == 'mixed':
-
-                ai_category = 'mixed'
-
-                ai_confidence = (
-                    ai_result['materials'][0]['confidence']
-                    if ai_result.get('materials')
-                    else 0.0
-                )
-
-                ai_labels = json.dumps(
-                    [
-                        m['name']
-                        for m in ai_result.get(
-                            'materials',
-                            []
-                        )
-                    ]
-                )
-
-
-            else:
-
-                ai_category = (
-                    ai_result['materials'][0]['name']
-                    if ai_result.get('materials')
-                    else 'unknown'
-                )
-
-                ai_confidence = (
-                    ai_result['materials'][0]['confidence']
-                    if ai_result.get('materials')
-                    else 0.0
-                )
-
-                ai_labels = json.dumps(
-                    [ai_category]
-                )
-
-
-            # Final scrap category
-            final_type = (
-                manual_category
-                if manual_category
-                else ai_category
-            )
-
-
-            # Price mapping
-            prices = {
-                'plastic': 15.0,
-                'metal': 40.0,
-                'paper': 10.0,
-                'cardboard': 8.0,
-                'glass': 5.0,
-                'e-waste': 50.0
-            }
-
-
-            est_price = prices.get(
-                (final_type or 'unknown').lower(),
-                0.0
-            )
-
-
-            # Create scrap record
-            new_upload = ScrapUpload(
-
-                user_id=current_user.id,
-
-                image_url=filename,
-
-                scrap_type=final_type,
-
-                detected_type=ai_category,
-
-                detected_labels=ai_labels,
-
-                estimated_price=est_price,
-
-                confidence_score=ai_confidence,
-
-                status='pending',
-
-                weight=0.0,
-
-                points_earned=0,
-
-                notification_seen=False
-            )
-
-
-            db.session.add(new_upload)
-
-            db.session.commit()
-
-
-            flash(
-                f"Scrap submitted for admin approval! "
-                f"Detection status: {final_type}",
-                'success'
-            )
-
-
-            return redirect(
-                url_for('user.dashboard')
-            )
-
-
-        else:
-
-            flash(
-                f"Unsupported format! "
-                f"Please upload an image ending in "
-                f"{', '.join(allowed_exts)}.",
-                'error'
-            )
-
+# ==================================================
+# SCRAPS LIST
+# ==================================================
+
+@admin_bp.route('/scraps')
+def scraps():
+
+    scraps_list = (
+        ScrapUpload.query
+        .order_by(ScrapUpload.created_at.desc())
+        .all()
+    )
 
     return render_template(
-        'user/upload.html'
+        'admin/scraps.html',
+        scraps=scraps_list
     )
 
 
-# ==========================================
-# PICKUP REQUEST
-# ==========================================
-@user_bp.route('/pickup', methods=['GET', 'POST'])
-@login_required
-def pickup():
+# ==================================================
+# EMAIL FUNCTION
+# ==================================================
 
-    if request.method == 'POST':
+def send_async_email(app, msg):
 
-        date = request.form.get('date')
+    try:
 
-        time = request.form.get('time')
+        from app import mail
 
-        address = request.form.get('address')
+        with app.app_context():
+
+            mail.send(msg)
+
+        print("Email sent successfully")
+
+    except Exception as e:
+
+        print(f"Mail failed: {e}")
 
 
-        # Create pickup request
-        req = PickupRequest(
+def send_email_in_background(app, msg):
 
-            user_id=current_user.id,
+    try:
 
-            pickup_date=date,
-
-            time_slot=time,
-
-            address=address,
-
-            status='pending',
-
-            notification_seen=False
+        thread = threading.Thread(
+            target=send_async_email,
+            args=(app, msg),
+            daemon=True
         )
 
+        thread.start()
 
-        db.session.add(req)
+    except Exception as e:
 
-        db.session.commit()
+        print(f"Email thread error: {e}")
 
 
-        # Optional email to admin
+# ==================================================
+# APPROVE / REJECT SCRAP
+# ==================================================
+
+@admin_bp.route(
+    '/approve-scrap/<int:id>',
+    methods=['POST']
+)
+def approve_scrap(id):
+
+    scrap = ScrapUpload.query.get_or_404(id)
+
+    target_user = User.query.get(
+        scrap.user_id
+    )
+
+    action = request.form.get('action')
+
+    # ----------------------------------------------
+    # APPROVE SCRAP
+    # ----------------------------------------------
+
+    if action == 'approve':
+
         try:
 
-            from app import mail
-            from flask_mail import Message
-
-            sender_email = current_app.config.get(
-                'MAIL_USERNAME'
+            weight = float(
+                request.form.get('weight', 0)
             )
 
-            if sender_email:
+        except (ValueError, TypeError):
 
-                msg = Message(
+            weight = 0.0
 
-                    'New Scrap Pickup Request',
+        if weight <= 0:
 
-                    sender=sender_email,
-
-                    recipients=[sender_email]
-                )
-
-                msg.body = (
-                    f"New pickup from "
-                    f"{current_user.name} "
-                    f"at {address} "
-                    f"on {date} "
-                    f"during {time}."
-                )
-
-                mail.send(msg)
-
-        except Exception as e:
-
-            print(
-                f"Pickup email error: {e}"
+            flash(
+                'Weight must be greater than zero.',
+                'danger'
             )
 
+            return redirect(
+                url_for('admin.scraps')
+            )
+
+        # Update scrap
+
+        scrap.status = 'approved'
+
+        # IMPORTANT:
+        # Make notification appear for user
+
+        scrap.notification_seen = False
+
+        scrap.weight = weight
+
+        # Calculate rate
+
+        rate = scrap.estimated_price or 5.0
+
+        points = int(
+            weight * rate
+        )
+
+        scrap.points_earned = points
+
+        # Add points to user
+
+        if target_user:
+
+            target_user.eco_score = (
+                target_user.eco_score or 0
+            ) + points
+
+        # Save changes
+
+        db.session.commit()
+
+        # ------------------------------------------
+        # SEND EMAIL
+        # ------------------------------------------
+
+        sender_email = current_app.config.get(
+            'MAIL_USERNAME'
+        )
+
+        if sender_email and target_user:
+
+            msg = Message(
+
+                subject='Your Scrap Request Was Approved!',
+
+                sender=sender_email,
+
+                recipients=[
+                    target_user.email
+                ],
+
+                body=(
+                    f"Hello {target_user.name},\n\n"
+                    f"Great news! Your "
+                    f"{scrap.scrap_type} scrap request "
+                    f"has been approved.\n\n"
+                    f"Weight: {weight} kg\n"
+                    f"Eco Points Earned: {points}\n\n"
+                    f"Thank you for recycling with ScrapSutra!"
+                )
+            )
+
+            send_email_in_background(
+                current_app._get_current_object(),
+                msg
+            )
 
         flash(
-            'Pickup request submitted successfully',
+            f'Scrap approved successfully. '
+            f'{points} Eco Points awarded.',
             'success'
         )
 
 
-        return redirect(
-            url_for('user.pickup')
+    # ----------------------------------------------
+    # REJECT SCRAP
+    # ----------------------------------------------
+
+    elif action == 'reject':
+
+        scrap.status = 'rejected'
+
+        # IMPORTANT:
+        # Make rejection popup appear
+
+        scrap.notification_seen = False
+
+        db.session.commit()
+
+        # Send rejection email
+
+        sender_email = current_app.config.get(
+            'MAIL_USERNAME'
+        )
+
+        if sender_email and target_user:
+
+            msg = Message(
+
+                subject='Update on Your Scrap Request',
+
+                sender=sender_email,
+
+                recipients=[
+                    target_user.email
+                ],
+
+                body=(
+                    f"Hello {target_user.name},\n\n"
+                    f"Unfortunately, your "
+                    f"{scrap.scrap_type} scrap request "
+                    f"was rejected.\n\n"
+                    f"You can upload another scrap request "
+                    f"and try again."
+                )
+            )
+
+            send_email_in_background(
+                current_app._get_current_object(),
+                msg
+            )
+
+        flash(
+            'Scrap request rejected.',
+            'danger'
         )
 
 
-    # Get user's pickup history
-    pickups = (
-        PickupRequest.query
-        .filter_by(user_id=current_user.id)
-        .order_by(
-            PickupRequest.created_at.desc()
-        )
-        .all()
+    return redirect(
+        url_for('admin.scraps')
     )
 
 
-    return render_template(
-        'user/pickup.html',
-        pickups=pickups
+# ==================================================
+# APPROVE PICKUP
+# ==================================================
+
+@admin_bp.route(
+    '/approve-pickup/<int:id>',
+    methods=['POST']
+)
+def approve_pickup(id):
+
+    pickup = PickupRequest.query.get_or_404(id)
+
+    target_user = User.query.get(
+        pickup.user_id
+    )
+
+    # Update status
+
+    pickup.status = 'approved'
+
+    # IMPORTANT:
+    # Make popup appear for user
+
+    pickup.notification_seen = False
+
+    # Save database
+
+    db.session.commit()
+
+    # ----------------------------------------------
+    # SEND EMAIL
+    # ----------------------------------------------
+
+    sender_email = current_app.config.get(
+        'MAIL_USERNAME'
+    )
+
+    if sender_email and target_user:
+
+        msg = Message(
+
+            subject='Your Pickup Request Was Approved!',
+
+            sender=sender_email,
+
+            recipients=[
+                target_user.email
+            ],
+
+            body=(
+                f"Hello {target_user.name},\n\n"
+                f"Your pickup request has been approved!\n\n"
+                f"Date: {pickup.pickup_date}\n"
+                f"Time: {pickup.time_slot}\n\n"
+                f"Our team will contact you soon."
+            )
+        )
+
+        send_email_in_background(
+            current_app._get_current_object(),
+            msg
+        )
+
+    flash(
+        'Pickup request approved successfully.',
+        'success'
+    )
+
+    return redirect(
+        url_for('admin.pickups')
+    )
+
+
+# ==================================================
+# REJECT PICKUP
+# ==================================================
+
+@admin_bp.route(
+    '/reject-pickup/<int:id>',
+    methods=['POST']
+)
+def reject_pickup(id):
+
+    pickup = PickupRequest.query.get_or_404(id)
+
+    target_user = User.query.get(
+        pickup.user_id
+    )
+
+    # Update status
+
+    pickup.status = 'rejected'
+
+    # IMPORTANT:
+    # Make rejection popup appear
+
+    pickup.notification_seen = False
+
+    # Save database
+
+    db.session.commit()
+
+    # ----------------------------------------------
+    # SEND EMAIL
+    # ----------------------------------------------
+
+    sender_email = current_app.config.get(
+        'MAIL_USERNAME'
+    )
+
+    if sender_email and target_user:
+
+        msg = Message(
+
+            subject='Update on Your Pickup Request',
+
+            sender=sender_email,
+
+            recipients=[
+                target_user.email
+            ],
+
+            body=(
+                f"Hello {target_user.name},\n\n"
+                f"Unfortunately, your pickup request "
+                f"for {pickup.pickup_date} during "
+                f"{pickup.time_slot} was rejected.\n\n"
+                f"Please submit another pickup request."
+            )
+        )
+
+        send_email_in_background(
+            current_app._get_current_object(),
+            msg
+        )
+
+    flash(
+        'Pickup request rejected.',
+        'danger'
+    )
+
+    return redirect(
+        url_for('admin.pickups')
     )
