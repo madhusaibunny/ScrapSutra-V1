@@ -162,7 +162,7 @@
                                  style="width: 50px; height: 6px; background-color: rgba(255,255,255,0.1);">
 
                                 <div class="progress-bar bg-success"
-                                     style="width: {{ confidence_percent }}%;">
+                                     data-confidence="{{ confidence_percent }}">
                                 </div>
 
                             </div>
@@ -336,7 +336,15 @@
 
 <script>
 
+// Set progress bar widths
 document.addEventListener("DOMContentLoaded", function () {
+
+    const progressBars = document.querySelectorAll('.progress-bar[data-confidence]');
+
+    progressBars.forEach(function(bar) {
+        const confidence = parseFloat(bar.getAttribute('data-confidence'));
+        bar.style.width = confidence + '%';
+    });
 
     const notificationElement =
         document.getElementById("notificationModal");
