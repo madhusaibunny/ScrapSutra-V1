@@ -1,171 +1,239 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from functools import wraps
+from flask import Blueprint
+
+admin_bp = Blueprint("admin", __name__)
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
 from database.models import (
     db,
+    User,
     ScrapUpload,
     PickupRequest
 )
 
 
 # ==================================================
-# USER BLUEPRINT
+# ADMIN BLUEPRINT
 # ==================================================
 
-user_bp = Blueprint('user', __name__)
+admin_bp = Blueprint('admin', __name__)
 
 
 # ==================================================
-# USER DASHBOARD
+# ADMIN-ONLY ACCESS GUARD
 # ==================================================
 
-@user_bp.route('/dashboard')
+def admin_required(view_func):
+
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+
+        if current_user.role != 'admin':
+            flash('Admin access required.', 'error')
+            return redirect(url_for('user.dashboard'))
+
+        return view_func(*args, **kwargs)
+
+    return wrapped
+
+
+# ==================================================
+# SCRAP CATEGORY RATES (₹ per kg)
+# Keep this in sync with the /pricing page in app.py
+# ==================================================
+
+CATEGORY_RATES = {
+    'plastic': 15,
+    'metal': 40,
+    'paper': 10,
+    'cardboard': 8,
+    'glass': 5,
+    'e-waste': 50,
+}
+
+DEFAULT_RATE = 10
+
+
+def get_rate_for_category(category):
+    return CATEGORY_RATES.get((category or '').strip().lower(), DEFAULT_RATE)
+
+
+# ==================================================
+# ADMIN DASHBOARD
+# ==================================================
+
+@admin_bp.route('/dashboard')
 @login_required
+@admin_required
 def dashboard():
 
-    # Get all scraps of current user
-    scraps = (
+    total_users = User.query.count()
+    total_scrap = ScrapUpload.query.count()
+    total_pickups = PickupRequest.query.count()
+
+    recent_users = (
+        User.query
+        .order_by(User.created_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    return render_template(
+        'admin/dashboard.html',
+        total_users=total_users,
+        total_scrap=total_scrap,
+        total_pickups=total_pickups,
+        recent_users=recent_users
+    )
+
+
+# ==================================================
+# USER MANAGEMENT
+# ==================================================
+
+@admin_bp.route('/users')
+@login_required
+@admin_required
+def users():
+
+    all_users = (
+        User.query
+        .order_by(User.created_at.desc())
+        .all()
+    )
+
+    return render_template(
+        'admin/users.html',
+        users=all_users
+    )
+
+
+# ==================================================
+# SCRAP VERIFICATION
+# ==================================================
+
+@admin_bp.route('/scraps')
+@login_required
+@admin_required
+def scraps():
+
+    all_scraps = (
         ScrapUpload.query
-        .filter_by(user_id=current_user.id)
         .order_by(ScrapUpload.created_at.desc())
         .all()
     )
 
-    # Get counts
-    pending_count = (
-        ScrapUpload.query
-        .filter_by(
-            user_id=current_user.id,
-            status='pending'
-        )
-        .count()
-    )
-
-    approved_count = (
-        ScrapUpload.query
-        .filter_by(
-            user_id=current_user.id,
-            status='approved'
-        )
-        .count()
-    )
-
-    total_points = current_user.eco_score or 0
-
-
-    # ==================================================
-    # CHECK SCRAP NOTIFICATION
-    # ==================================================
-
-    scrap_notification = (
-        ScrapUpload.query
-        .filter(
-            ScrapUpload.user_id == current_user.id,
-            ScrapUpload.status.in_(['approved', 'rejected']),
-            ScrapUpload.notification_seen == False
-        )
-        .order_by(ScrapUpload.created_at.desc())
-        .first()
+    return render_template(
+        'admin/scraps.html',
+        scraps=all_scraps
     )
 
 
-    notification = None
+@admin_bp.route('/scraps/<int:id>/approve', methods=['POST'])
+@login_required
+@admin_required
+def approve_scrap(id):
 
+    scrap = ScrapUpload.query.get_or_404(id)
 
-    if scrap_notification:
+    action = request.form.get('action', 'approve')
 
-        if scrap_notification.status == 'approved':
+    if action == 'reject':
 
-            notification = {
-                'type': 'success',
-                'title': 'Scrap Approved! 🎉',
-                'message': (
-                    f"Your {scrap_notification.scrap_type} "
-                    f"scrap request was approved. "
-                    f"You earned "
-                    f"{scrap_notification.points_earned or 0} "
-                    f"Eco Points!"
-                )
-            }
-
-        elif scrap_notification.status == 'rejected':
-
-            notification = {
-                'type': 'error',
-                'title': 'Scrap Request Rejected',
-                'message': (
-                    f"Your {scrap_notification.scrap_type} "
-                    f"scrap request was rejected by the admin."
-                )
-            }
-
-        # Mark notification as seen
-        scrap_notification.notification_seen = True
+        scrap.status = 'rejected'
+        scrap.notification_seen = False
 
         db.session.commit()
 
+        flash(f'Scrap #{scrap.id} rejected.', 'success')
 
-    # ==================================================
-    # CHECK PICKUP NOTIFICATION
-    # Only if no scrap notification is being shown
-    # ==================================================
+        return redirect(url_for('admin.scraps'))
 
-    if notification is None:
+    # -----------------------------------------------------
+    # APPROVE: read verified weight, calculate price/points
+    # -----------------------------------------------------
 
-        pickup_notification = (
-            PickupRequest.query
-            .filter(
-                PickupRequest.user_id == current_user.id,
-                PickupRequest.status.in_(['approved', 'rejected']),
-                PickupRequest.notification_seen == False
-            )
-            .order_by(PickupRequest.created_at.desc())
-            .first()
-        )
+    try:
+        weight = float(request.form.get('weight', 0))
+    except (TypeError, ValueError):
+        weight = 0.0
 
+    if weight <= 0:
+        flash('Please enter a valid weight before approving.', 'danger')
+        return redirect(url_for('admin.scraps'))
 
-        if pickup_notification:
+    rate = get_rate_for_category(scrap.scrap_type)
+    points = int(round(weight * rate))
 
-            if pickup_notification.status == 'approved':
+    scrap.weight = weight
+    scrap.estimated_price = rate
+    scrap.points_earned = points
+    scrap.status = 'approved'
+    scrap.notification_seen = False
 
-                notification = {
-                    'type': 'success',
-                    'title': 'Pickup Approved! 🚚',
-                    'message': (
-                        f"Your pickup request for "
-                        f"{pickup_notification.pickup_date} "
-                        f"during {pickup_notification.time_slot} "
-                        f"has been approved!"
-                    )
-                }
+    # Credit the user's eco score
+    user = User.query.get(scrap.user_id)
+    if user:
+        user.eco_score = (user.eco_score or 0) + points
 
-            elif pickup_notification.status == 'rejected':
+    db.session.commit()
 
-                notification = {
-                    'type': 'error',
-                    'title': 'Pickup Request Rejected',
-                    'message': (
-                        f"Your pickup request for "
-                        f"{pickup_notification.pickup_date} "
-                        f"was rejected by the admin."
-                    )
-                }
+    flash(f'Scrap #{scrap.id} approved — {points} points issued.', 'success')
 
-            # Mark notification as seen
-            pickup_notification.notification_seen = True
-
-            db.session.commit()
+    return redirect(url_for('admin.scraps'))
 
 
-    # ==================================================
-    # RENDER DASHBOARD
-    # ==================================================
+# ==================================================
+# PICKUP SCHEDULING
+# ==================================================
+
+@admin_bp.route('/pickups')
+@login_required
+@admin_required
+def pickups():
+
+    all_pickups = (
+        PickupRequest.query
+        .order_by(PickupRequest.created_at.desc())
+        .all()
+    )
 
     return render_template(
-        'user/dashboard.html',
-        scraps=scraps,
-        pending_count=pending_count,
-        approved_count=approved_count,
-        total_points=total_points,
-        notification=notification
+        'admin/pickups.html',
+        pickups=all_pickups
     )
+
+
+@admin_bp.route('/pickups/<int:id>/approve', methods=['POST'])
+@login_required
+@admin_required
+def approve_pickup(id):
+
+    pickup = PickupRequest.query.get_or_404(id)
+
+    pickup.status = 'approved'
+    pickup.notification_seen = False
+
+    db.session.commit()
+
+    flash(f'Pickup #{pickup.id} approved and dispatched.', 'success')
+
+    return redirect(url_for('admin.pickups'))
+
+
+@admin_bp.route('/pickups/<int:id>/reject', methods=['POST'])
+@login_required
+@admin_required
+def reject_pickup(id):
+
+    pickup = PickupRequest.query.get_or_404(id)
+
+    pickup.status = 'rejected'
+    pickup.notification_seen = False
+
+    db.session.commit()
+
+    flash(f'Pickup #{pickup.id} rejected.', 'success')
+
+    return redirect(url_for('admin.pickups'))
