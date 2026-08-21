@@ -3,7 +3,7 @@
 {% block content %}
 
 <!-- ========================================= -->
-<!-- PICKUP STATUS NOTIFICATION MODAL -->
+<!-- PICKUP NOTIFICATION POPUP -->
 <!-- ========================================= -->
 
 {% if session.get('pickup_notification') %}
@@ -13,81 +13,76 @@
 <div class="modal fade"
      id="pickupNotificationModal"
      tabindex="-1"
-     aria-labelledby="pickupNotificationLabel"
+     aria-labelledby="pickupNotificationModalLabel"
      aria-hidden="true">
 
     <div class="modal-dialog modal-dialog-centered">
 
-        <div class="modal-content bg-dark text-light border-0 rounded-4 shadow-lg">
+        <div class="modal-content glass-card border-0">
 
-            <div class="modal-body text-center p-5">
+            <div class="modal-header border-secondary border-opacity-25">
+
+                <h5 class="modal-title fw-bold"
+                    id="pickupNotificationModalLabel">
+
+                    <i class="fa-solid fa-bell text-success me-2"></i>
+
+                    ScrapSutra Notification
+
+                </h5>
+
+                <button type="button"
+                        class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"
+                        aria-label="Close">
+                </button>
+
+            </div>
+
+            <div class="modal-body text-center py-4">
 
                 {% if notification.status == 'approved' %}
 
-                    <div class="mb-4">
-                        <i class="fa-solid fa-circle-check text-success"
-                           style="font-size: 5rem;"></i>
-                    </div>
+                    <i class="fa-solid fa-circle-check
+                              text-success
+                              display-4
+                              mb-3">
+                    </i>
 
-                    <h2 class="fw-bold text-success mb-3">
-                        Pickup Confirmed! 🎉
-                    </h2>
+                {% else %}
 
-                    <p class="fs-5 text-light">
-                        Great news! Your scrap pickup request has been approved.
-                    </p>
-
-                    <div class="p-3 rounded-4 bg-success bg-opacity-10 border border-success mt-4">
-
-                        <div class="mb-2">
-                            <i class="fa-regular fa-calendar me-2 text-success"></i>
-                            <strong>{{ notification.date }}</strong>
-                        </div>
-
-                        <div>
-                            <i class="fa-regular fa-clock me-2 text-success"></i>
-                            {{ notification.time }}
-                        </div>
-
-                    </div>
-
-                {% elif notification.status == 'rejected' %}
-
-                    <div class="mb-4">
-                        <i class="fa-solid fa-circle-xmark text-danger"
-                           style="font-size: 5rem;"></i>
-                    </div>
-
-                    <h2 class="fw-bold text-danger mb-3">
-                        Pickup Rejected
-                    </h2>
-
-                    <p class="fs-5 text-light">
-                        Unfortunately, your pickup request was rejected.
-                        Please choose another date and schedule a new pickup.
-                    </p>
-
-                    <div class="p-3 rounded-4 bg-danger bg-opacity-10 border border-danger mt-4">
-
-                        <div class="mb-2">
-                            <i class="fa-regular fa-calendar me-2 text-danger"></i>
-                            <strong>{{ notification.date }}</strong>
-                        </div>
-
-                        <div>
-                            <i class="fa-regular fa-clock me-2 text-danger"></i>
-                            {{ notification.time }}
-                        </div>
-
-                    </div>
+                    <i class="fa-solid fa-circle-xmark
+                              text-danger
+                              display-4
+                              mb-3">
+                    </i>
 
                 {% endif %}
 
+
+                <h4 class="fw-bold">
+
+                    {{ notification.title }}
+
+                </h4>
+
+
+                <p class="text-muted mb-0">
+
+                    {{ notification.message }}
+
+                </p>
+
+            </div>
+
+
+            <div class="modal-footer border-secondary border-opacity-25">
+
                 <button type="button"
-                        class="btn btn-primary-custom w-100 mt-4 py-3"
+                        class="btn btn-primary-custom w-100"
                         data-bs-dismiss="modal">
 
-                    Got It
+                    Okay
 
                 </button>
 
@@ -103,25 +98,35 @@
 
 
 <!-- ========================================= -->
-<!-- DASHBOARD -->
+<!-- DASHBOARD TOP SECTION -->
 <!-- ========================================= -->
 
 <div class="row g-4 mb-4">
+
+    <!-- Welcome & Wallet -->
 
     <div class="col-12 col-lg-7">
 
         <div class="glass-card h-100 p-4">
 
             <h3 class="fw-bold mb-4">
+
                 Welcome, {{ current_user.name }}!
+
             </h3>
 
+
             <div class="d-flex flex-wrap gap-4 p-4 rounded-4 bg-dark bg-opacity-25 border border-secondary border-opacity-25 mb-4">
+
+
+                <!-- Wallet -->
 
                 <div class="flex-grow-1">
 
                     <p class="text-muted mb-1 fs-6">
+
                         Total Wallet Amount
+
                     </p>
 
                     <div class="fs-1 fw-bold text-success">
@@ -134,14 +139,21 @@
 
                 </div>
 
+
+                <!-- Eco Points -->
+
                 <div class="border-start border-secondary border-opacity-50 ps-4 flex-grow-1">
 
                     <p class="text-muted mb-1 fs-6">
+
                         Eco Points MTD
+
                     </p>
 
                     <div class="fs-1 fw-bold text-success">
+
                         {{ total_points }}
+
                     </div>
 
                 </div>
@@ -149,12 +161,15 @@
             </div>
 
 
+            <!-- Action Buttons -->
+
             <div class="d-flex flex-wrap gap-3">
 
                 <a href="{{ url_for('user.upload_scrap') }}"
                    class="btn btn-primary-custom flex-grow-1 py-3">
 
                     <i class="fa-solid fa-camera me-2"></i>
+
                     Scan Real Scrap
 
                 </a>
@@ -164,6 +179,7 @@
                    class="btn btn-outline-success flex-grow-1 py-3">
 
                     <i class="fa-solid fa-truck me-2"></i>
+
                     Request Pickup
 
                 </a>
@@ -175,34 +191,52 @@
     </div>
 
 
+    <!-- ========================================= -->
+    <!-- SCRAP STATISTICS -->
+    <!-- ========================================= -->
+
     <div class="col-12 col-lg-5">
 
         <div class="glass-card h-100 p-4 d-flex justify-content-around align-items-center text-center">
 
+
+            <!-- Pending -->
+
             <div>
 
                 <div class="display-3 fw-bold text-warning">
+
                     {{ pending_count }}
+
                 </div>
 
                 <p class="text-light opacity-75 mt-2 mb-0">
+
                     Pending Scraps
+
                 </p>
 
             </div>
 
+
+            <!-- Approved -->
 
             <div>
 
                 <div class="display-3 fw-bold text-success">
+
                     {{ approved_count }}
+
                 </div>
 
                 <p class="text-light opacity-75 mt-2 mb-0">
+
                     Approved Scraps
+
                 </p>
 
             </div>
+
 
         </div>
 
@@ -218,7 +252,9 @@
 <div class="glass-card p-4">
 
     <h3 class="fw-bold mb-4">
+
         Recent Scrap Submissions
+
     </h3>
 
 
@@ -250,37 +286,53 @@
 
                 <tr>
 
+
+                    <!-- Date -->
+
                     <td>
+
                         {{ scrap.created_at.strftime('%Y-%m-%d %H:%M') }}
+
                     </td>
 
+
+                    <!-- Scrap Type -->
 
                     <td class="fw-medium">
+
                         {{ scrap.scrap_type|title }}
+
                     </td>
 
+
+                    <!-- Price -->
 
                     <td>
+
                         ₹{{ scrap.estimated_price|round(2) }}
+
                     </td>
 
+
+                    <!-- Confidence -->
 
                     <td>
 
                         <div class="d-flex align-items-center gap-2">
 
                             <span>
+
                                 {{ (scrap.confidence_score * 100)|round(1) }}%
+
                             </span>
 
 
                             <div class="progress"
-                                 style="width: 50px;
-                                        height: 6px;
-                                        background-color: rgba(255,255,255,0.1);">
+                                 style="width: 50px; height: 6px; background-color: rgba(255,255,255,0.1);">
 
                                 <div class="progress-bar bg-success"
                                      style="width: {{ scrap.confidence_score * 100 }}%">
+
                                 </div>
 
                             </div>
@@ -290,19 +342,17 @@
                     </td>
 
 
+                    <!-- Status -->
+
                     <td>
 
                         <span class="badge badge-custom
-
                             {% if scrap.status == 'approved' %}
                                 bg-approved
-
                             {% elif scrap.status == 'rejected' %}
                                 bg-rejected
-
                             {% else %}
                                 bg-pending
-
                             {% endif %}">
 
                             {{ scrap.status|title }}
@@ -312,27 +362,36 @@
                     </td>
 
 
+                    <!-- Points -->
+
                     <td>
 
                         {% if scrap.status == 'approved' %}
 
                             <span class="text-success fw-bold">
+
                                 {{ scrap.points_earned }} pts
+
                             </span>
 
                             <span class="text-muted small">
+
                                 ({{ scrap.weight }} kg)
+
                             </span>
 
                         {% else %}
 
                             <span class="text-muted">
+
                                 -
+
                             </span>
 
                         {% endif %}
 
                     </td>
+
 
                 </tr>
 
@@ -347,12 +406,17 @@
 
     {% else %}
 
+
+    <!-- No Scrap -->
+
     <div class="text-center py-5">
 
         <i class="fa-solid fa-camera display-1 text-muted opacity-25 mb-3"></i>
 
         <p class="text-light opacity-75 fs-5">
+
             You haven't submitted any scrap yet.
+
         </p>
 
         <a href="{{ url_for('user.upload_scrap') }}"
@@ -364,44 +428,29 @@
 
     </div>
 
+
     {% endif %}
 
 </div>
 
 
 <!-- ========================================= -->
-<!-- AUTO SHOW PICKUP NOTIFICATION -->
+<!-- AUTO SHOW NOTIFICATION -->
 <!-- ========================================= -->
-
-{% if notification %}
-
 <script>
+document.addEventListener("DOMContentLoaded", function () {
 
-    document.addEventListener(
-        "DOMContentLoaded",
-        function () {
+    const modalElement =
+        document.getElementById("pickupNotificationModal");
 
-            const modalElement =
-                document.getElementById(
-                    "pickupNotificationModal"
-                );
+    if (modalElement && typeof bootstrap !== "undefined") {
 
-            if (modalElement) {
+        const pickupModal =
+            new bootstrap.Modal(modalElement);
 
-                const pickupModal =
-                    new bootstrap.Modal(
-                        modalElement
-                    );
+        pickupModal.show();
 
-                pickupModal.show();
+    }
 
-            }
-
-        }
-    );
-
+});
 </script>
-
-{% endif %}
-
-{% endblock %}
