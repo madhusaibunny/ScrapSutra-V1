@@ -166,10 +166,9 @@ def approve_scrap(id):
                 target_user.eco_score or 0
             ) + points
 
-        # SAVE DATABASE FIRST
+        # Save database first
         db.session.commit()
 
-        # EMAIL AFTER DATABASE IS SAVED
         sender_email = current_app.config.get(
             'MAIL_USERNAME'
         )
@@ -228,17 +227,17 @@ def approve_pickup(id):
         pickup.user_id
     )
 
-    # APPROVE FIRST
+    # Update status
     pickup.status = 'approved'
 
-    # SAVE DATABASE FIRST
+    # Save database first
     db.session.commit()
 
     print(
         f"Pickup {pickup.id} approved successfully"
     )
 
-    # SEND EMAIL IN BACKGROUND
+    # Send email in background
     sender_email = current_app.config.get(
         'MAIL_USERNAME'
     )
@@ -269,6 +268,64 @@ def approve_pickup(id):
         f"Pickup request approved successfully for "
         f"{target_user.name if target_user else 'user'}.",
         "success"
+    )
+
+    return redirect(
+        url_for('admin.pickups')
+    )
+
+
+# -----------------------------
+# REJECT PICKUP
+# -----------------------------
+@admin_bp.route('/reject-pickup/<int:id>', methods=['POST'])
+def reject_pickup(id):
+
+    pickup = PickupRequest.query.get_or_404(id)
+
+    target_user = User.query.get(
+        pickup.user_id
+    )
+
+    # Update status
+    pickup.status = 'rejected'
+
+    # Save database first
+    db.session.commit()
+
+    print(
+        f"Pickup {pickup.id} rejected successfully"
+    )
+
+    # Send rejection email in background
+    sender_email = current_app.config.get(
+        'MAIL_USERNAME'
+    )
+
+    if sender_email and target_user:
+
+        msg = Message(
+            subject="Update on Your Pickup Request",
+            sender=sender_email,
+            recipients=[target_user.email],
+            body=(
+                f"Hello {target_user.name},\n\n"
+                f"Unfortunately, your pickup request scheduled for "
+                f"{pickup.pickup_date} during "
+                f"{pickup.time_slot} could not be accepted.\n\n"
+                f"Please submit another pickup request with a "
+                f"different date or time."
+            )
+        )
+
+        send_email_in_background(
+            current_app._get_current_object(),
+            msg
+        )
+
+    flash(
+        'Pickup request rejected.',
+        'danger'
     )
 
     return redirect(
