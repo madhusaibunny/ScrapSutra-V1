@@ -136,7 +136,7 @@ Return ONLY valid JSON in exactly this format:
 
         response = client.models.generate_content(
 
-            model="gemini-2.0-flash",
+            model="gemini-3.6-flash",
 
             contents=[
                 prompt,
