@@ -1,63 +1,351 @@
 {% extends 'base.html' %}
+
 {% block content %}
+
 <div class="glass-card mx-auto" style="max-width: 600px;">
+
     <div class="text-center mb-4">
-        <h2 class="text-success fw-bold"><i class="fa-solid fa-microchip me-2"></i> AI Scrap Engine</h2>
-        <p class="text-light opacity-75">Upload a clear photo of your scrap material. Our neural network will detect its category automatically.</p>
+        <h2 class="text-success fw-bold">
+            <i class="fa-solid fa-microchip me-2"></i>
+            AI Scrap Engine
+        </h2>
+
+        <p class="text-light opacity-75">
+            Upload a clear photo of your scrap material.
+            Our AI will detect its category automatically.
+        </p>
     </div>
-    
-    <form method="POST" enctype="multipart/form-data">
-        <div class="mb-4 position-relative rounded-4 text-center p-5" id="dropZone" 
-             style="border: 2px dashed rgba(16, 185, 129, 0.4); background: rgba(0,0,0,0.2); transition: all 0.3s ease;"
-             onmouseover="this.style.borderColor='var(--primary)'; this.style.background='rgba(16, 185, 129, 0.05)'" 
-             onmouseout="this.style.borderColor='rgba(16, 185, 129, 0.4)'; this.style.background='rgba(0,0,0,0.2)'">
-            
-            <img id="imagePreview" src="" alt="Live Preview" class="img-fluid rounded-3 mb-3 shadow" style="display: none; max-height: 250px; object-fit: contain; margin: 0 auto;">
-            
-            <div id="uploadPrompt" class="pointer-events-none">
-                <i class="fa-solid fa-cloud-arrow-up display-1 text-success mb-3 opacity-75"></i>
-                <h5 class="fw-bold mb-1">Tap or Drag Image to Scan</h5>
-                <p class="text-muted small mb-0">Supports JPG, PNG, WEBP, HEIC</p>
+
+
+    <!-- UPLOAD FORM -->
+
+    <form method="POST"
+          enctype="multipart/form-data">
+
+        <div class="mb-4 position-relative rounded-4 text-center p-5"
+             id="dropZone"
+             style="
+                border: 2px dashed rgba(16, 185, 129, 0.4);
+                background: rgba(0,0,0,0.2);
+                transition: all 0.3s ease;
+                min-height: 250px;
+             ">
+
+
+            <!-- IMAGE PREVIEW -->
+
+            <img
+                id="imagePreview"
+                src=""
+                alt="Selected Image"
+                class="img-fluid rounded-3 mb-3 shadow"
+                style="
+                    display: none;
+                    max-height: 250px;
+                    max-width: 100%;
+                    object-fit: contain;
+                    margin: 0 auto;
+                "
+            >
+
+
+            <!-- UPLOAD MESSAGE -->
+
+            <div id="uploadPrompt">
+
+                <i class="fa-solid fa-cloud-arrow-up
+                          display-1
+                          text-success
+                          mb-3
+                          opacity-75">
+                </i>
+
+                <h5 class="fw-bold mb-1">
+                    Click or Drag Image to Scan
+                </h5>
+
+                <p class="text-muted small mb-0">
+                    Supports JPG, JPEG, PNG and WEBP
+                </p>
+
             </div>
 
-            <input type="file" id="fileInput" name="scrap_image" accept="image/*" required class="position-absolute top-0 start-0 w-100 h-100 opacity-0" style="cursor: pointer;">
+
+            <!-- FILE INPUT -->
+
+            <input
+                type="file"
+                id="fileInput"
+                name="scrap_image"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                required
+                class="position-absolute
+                       top-0
+                       start-0
+                       w-100
+                       h-100
+                       opacity-0"
+                style="cursor: pointer;"
+            >
+
         </div>
-        
+
+
+        <!-- FILE NAME -->
+
+        <div
+            id="fileName"
+            class="text-center text-success small mb-3"
+            style="display: none;"
+        >
+        </div>
+
+
+        <!-- MANUAL CATEGORY -->
+
         <div class="mb-4">
-            <label class="form-label text-light fw-medium">Manual Category Override (Optional)</label>
-            <p class="text-muted small mb-2">Only select if you want to forcefully bypass the AI logic.</p>
-            <select name="manual_category" class="form-select form-select-glass form-select-lg">
-                <option value="">⚡ Auto-Detect via AI</option>
-                <option value="plastic">Plastic Resource - ₹15/kg</option>
-                <option value="metal">Scrap Metal - ₹40/kg</option>
-                <option value="paper">Paper / Document - ₹10/kg</option>
-                <option value="cardboard">Corrugated Cardboard - ₹8/kg</option>
-                <option value="glass">Glass Object - ₹5/kg</option>
-                <option value="e-waste">E-Waste / Hardware - ₹50/kg</option>
+
+            <label class="form-label text-light fw-medium">
+
+                Manual Category Override
+                <span class="text-muted">
+                    (Optional)
+                </span>
+
+            </label>
+
+            <p class="text-muted small mb-2">
+                Leave this as Auto-Detect to let AI identify the scrap.
+            </p>
+
+
+            <select
+                name="manual_category"
+                class="form-select
+                       form-select-glass
+                       form-select-lg"
+            >
+
+                <option value="">
+                    ⚡ Auto-Detect via AI
+                </option>
+
+                <option value="plastic">
+                    Plastic Resource - ₹15/kg
+                </option>
+
+                <option value="metal">
+                    Scrap Metal - ₹40/kg
+                </option>
+
+                <option value="paper">
+                    Paper / Document - ₹10/kg
+                </option>
+
+                <option value="cardboard">
+                    Corrugated Cardboard - ₹8/kg
+                </option>
+
+                <option value="glass">
+                    Glass Object - ₹5/kg
+                </option>
+
+                <option value="e-waste">
+                    E-Waste / Hardware - ₹50/kg
+                </option>
+
             </select>
+
         </div>
-        
-        <button type="submit" class="btn btn-primary-custom w-100 py-3 fs-5 rounded-3"><i class="fa-solid fa-radar me-2"></i> Analyze & Submit Scrap</button>
+
+
+        <!-- SUBMIT BUTTON -->
+
+        <button
+            type="submit"
+            class="btn
+                   btn-primary-custom
+                   w-100
+                   py-3
+                   fs-5
+                   rounded-3"
+            id="submitButton"
+        >
+
+            <i class="fa-solid fa-radar me-2"></i>
+
+            Analyze & Submit Scrap
+
+        </button>
+
     </form>
+
 </div>
 
+
 <script>
-document.getElementById('fileInput').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        if (!file.type.startsWith('image/')) {
-            alert('Please select a valid image file.');
+
+const fileInput = document.getElementById("fileInput");
+
+const imagePreview =
+    document.getElementById("imagePreview");
+
+const uploadPrompt =
+    document.getElementById("uploadPrompt");
+
+const fileName =
+    document.getElementById("fileName");
+
+const submitButton =
+    document.getElementById("submitButton");
+
+
+fileInput.addEventListener(
+    "change",
+    function(event) {
+
+        const file =
+            event.target.files[0];
+
+
+        if (!file) {
             return;
         }
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const preview = document.getElementById('imagePreview');
-            preview.src = event.target.result;
-            preview.style.display = 'block';
-            document.getElementById('uploadPrompt').style.display = 'none';
+
+
+        /*
+        =====================================
+        ALLOWED FILE EXTENSIONS
+        =====================================
+        */
+
+        const allowedExtensions =
+            ["jpg", "jpeg", "png", "webp"];
+
+
+        const fileExtension =
+            file.name
+                .split(".")
+                .pop()
+                .toLowerCase();
+
+
+        /*
+        =====================================
+        VALIDATE FILE
+        =====================================
+        */
+
+        if (
+            !allowedExtensions.includes(
+                fileExtension
+            )
+        ) {
+
+            alert(
+                "Only PNG, JPG, JPEG and WEBP images are allowed."
+            );
+
+
+            fileInput.value = "";
+
+
+            imagePreview.style.display =
+                "none";
+
+
+            uploadPrompt.style.display =
+                "block";
+
+
+            fileName.style.display =
+                "none";
+
+
+            return;
+
         }
-        reader.readAsDataURL(file);
+
+
+        /*
+        =====================================
+        SHOW FILE NAME
+        =====================================
+        */
+
+        fileName.innerHTML =
+            "✓ Selected: " +
+            file.name;
+
+
+        fileName.style.display =
+            "block";
+
+
+        /*
+        =====================================
+        IMAGE PREVIEW
+        =====================================
+        */
+
+        const reader =
+            new FileReader();
+
+
+        reader.onload =
+            function(e) {
+
+                imagePreview.src =
+                    e.target.result;
+
+
+                imagePreview.style.display =
+                    "block";
+
+
+                uploadPrompt.style.display =
+                    "none";
+
+            };
+
+
+        reader.readAsDataURL(
+            file
+        );
+
     }
-});
+);
+
+
+/*
+=====================================
+SHOW LOADING WHEN SUBMITTING
+=====================================
+*/
+
+document.querySelector("form")
+.addEventListener(
+    "submit",
+    function() {
+
+        submitButton.disabled =
+            true;
+
+
+        submitButton.innerHTML =
+            `
+            <span
+                class="spinner-border
+                       spinner-border-sm
+                       me-2">
+            </span>
+
+            AI is analyzing your scrap...
+            `;
+
+    }
+);
+
 </script>
+
 {% endblock %}

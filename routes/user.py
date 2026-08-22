@@ -2,6 +2,8 @@ import os
 import json
 import uuid
 
+from PIL import Image
+
 from werkzeug.utils import secure_filename
 
 from flask import (
@@ -47,11 +49,54 @@ ALLOWED_EXTENSIONS = {
 
 def allowed_file(filename):
 
-    return (
-        "." in filename
-        and filename.rsplit(".", 1)[1].lower()
-        in ALLOWED_EXTENSIONS
-    )
+    if not filename:
+        return False
+
+    filename = filename.strip()
+
+    if "." not in filename:
+        return False
+
+    extension = filename.rsplit(".", 1)[1].strip().lower()
+
+    return extension in ALLOWED_EXTENSIONS
+
+
+# =========================================================
+# VERIFY IMAGE
+# =========================================================
+
+def verify_image(file):
+
+    try:
+
+        # Move to beginning of file
+        file.stream.seek(0)
+
+        # Open image
+        image = Image.open(file.stream)
+
+        # Verify image is valid
+        image.verify()
+
+        # Move back to beginning
+        file.stream.seek(0)
+
+        return True
+
+    except Exception as e:
+
+        print(
+            f"Invalid image upload: {type(e).__name__} - {e}",
+            flush=True
+        )
+
+        try:
+            file.stream.seek(0)
+        except Exception:
+            pass
+
+        return False
 
 
 # =========================================================
@@ -88,6 +133,7 @@ def dashboard():
     )
 
     notification = None
+
 
     # =====================================================
     # CHECK SCRAP NOTIFICATION
@@ -130,6 +176,7 @@ def dashboard():
             }
 
         unseen_scrap.notification_seen = True
+
         db.session.commit()
 
     else:
@@ -176,7 +223,9 @@ def dashboard():
                 }
 
             unseen_pickup.notification_seen = True
+
             db.session.commit()
+
 
     return render_template(
         "user/dashboard.html",
@@ -199,14 +248,19 @@ def dashboard():
 @login_required
 def upload_scrap():
 
+    # =====================================================
+    # GET REQUEST
+    # =====================================================
+
     if request.method == "GET":
 
         return render_template(
             "user/upload.html"
         )
 
+
     # =====================================================
-    # GET IMAGE
+    # CHECK IMAGE FIELD
     # =====================================================
 
     if "scrap_image" not in request.files:
@@ -220,9 +274,15 @@ def upload_scrap():
             url_for("user.upload_scrap")
         )
 
+
     file = request.files["scrap_image"]
 
-    if not file or file.filename == "":
+
+    # =====================================================
+    # CHECK EMPTY FILE
+    # =====================================================
+
+    if not file or not file.filename:
 
         flash(
             "Please select an image.",
@@ -233,7 +293,49 @@ def upload_scrap():
             url_for("user.upload_scrap")
         )
 
-    if not allowed_file(file.filename):
+
+    # =====================================================
+    # CLEAN FILENAME
+    # =====================================================
+
+    original_filename = secure_filename(
+        file.filename
+    )
+
+
+    if not original_filename:
+
+        flash(
+            "Invalid image filename.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("user.upload_scrap")
+        )
+
+
+    # =====================================================
+    # CHECK FILE EXTENSION
+    # =====================================================
+
+    if not allowed_file(original_filename):
+
+        extension = ""
+
+        if "." in original_filename:
+
+            extension = original_filename.rsplit(
+                ".",
+                1
+            )[1].lower()
+
+        print(
+            f"Rejected file: {original_filename} | "
+            f"Extension: {extension} | "
+            f"MIME: {file.mimetype}",
+            flush=True
+        )
 
         flash(
             "Only PNG, JPG, JPEG and WEBP images are allowed.",
@@ -244,35 +346,92 @@ def upload_scrap():
             url_for("user.upload_scrap")
         )
 
+
     # =====================================================
-    # SAVE IMAGE
+    # VERIFY REAL IMAGE
     # =====================================================
 
-    original_filename = secure_filename(
-        file.filename
-    )
+    if not verify_image(file):
+
+        flash(
+            "The uploaded file is not a valid image.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("user.upload_scrap")
+        )
+
+
+    # =====================================================
+    # CREATE UNIQUE FILENAME
+    # =====================================================
 
     unique_filename = (
         f"{uuid.uuid4().hex}_"
         f"{original_filename}"
     )
 
+
+    # =====================================================
+    # GET UPLOAD FOLDER
+    # =====================================================
+
     upload_folder = current_app.config.get(
         "UPLOAD_FOLDER",
-        os.path.join("static", "uploads")
+        os.path.join(
+            "static",
+            "uploads"
+        )
     )
+
 
     os.makedirs(
         upload_folder,
         exist_ok=True
     )
 
+
+    # =====================================================
+    # CREATE IMAGE PATH
+    # =====================================================
+
     image_path = os.path.join(
         upload_folder,
         unique_filename
     )
 
-    file.save(image_path)
+
+    # =====================================================
+    # SAVE IMAGE
+    # =====================================================
+
+    try:
+
+        file.save(image_path)
+
+        print(
+            f"Image saved successfully: {image_path}",
+            flush=True
+        )
+
+    except Exception as e:
+
+        print(
+            f"IMAGE SAVE ERROR: "
+            f"{type(e).__name__} - {e}",
+            flush=True
+        )
+
+        flash(
+            "Unable to save the uploaded image.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("user.upload_scrap")
+        )
+
 
     # =====================================================
     # DEFAULT DETECTION RESULT
@@ -286,11 +445,16 @@ def upload_scrap():
 
     confidence_score = 0.0
 
-    # Manual override from actual template
+
+    # =====================================================
+    # MANUAL CATEGORY
+    # =====================================================
+
     manual_category = request.form.get(
         "manual_category",
         ""
     ).strip()
+
 
     # =====================================================
     # AI SCRAP DETECTION
@@ -313,15 +477,36 @@ def upload_scrap():
                 }
             ]
 
+            print(
+                f"Manual category selected: "
+                f"{manual_category}",
+                flush=True
+            )
+
+
         else:
+
+            print(
+                "Starting AI scrap detection...",
+                flush=True
+            )
+
 
             from models.scrap_detector import (
                 detect_scrap_type
             )
 
+
             result = detect_scrap_type(
                 image_path
             )
+
+
+            print(
+                f"AI DETECTION RESULT: {result}",
+                flush=True
+            )
+
 
             if result:
 
@@ -335,6 +520,11 @@ def upload_scrap():
                     []
                 )
 
+
+                # ---------------------------------------------
+                # SINGLE SCRAP
+                # ---------------------------------------------
+
                 if (
                     detection_type == "single"
                     and materials
@@ -345,12 +535,26 @@ def upload_scrap():
                         "Other/Unknown"
                     )
 
-                    confidence_score = float(
-                        materials[0].get(
-                            "confidence",
-                            0
+                    try:
+
+                        confidence_score = float(
+                            materials[0].get(
+                                "confidence",
+                                0
+                            )
                         )
-                    )
+
+                    except (
+                        TypeError,
+                        ValueError
+                    ):
+
+                        confidence_score = 0.0
+
+
+                # ---------------------------------------------
+                # MIXED SCRAP
+                # ---------------------------------------------
 
                 elif (
                     detection_type == "mixed"
@@ -359,15 +563,31 @@ def upload_scrap():
 
                     detected_type = "Mixed Scrap"
 
-                    confidence_values = [
-                        float(
-                            material.get(
-                                "confidence",
-                                0
+                    confidence_values = []
+
+
+                    for material in materials:
+
+                        try:
+
+                            confidence = float(
+                                material.get(
+                                    "confidence",
+                                    0
+                                )
                             )
-                        )
-                        for material in materials
-                    ]
+
+                            confidence_values.append(
+                                confidence
+                            )
+
+                        except (
+                            TypeError,
+                            ValueError
+                        ):
+
+                            pass
+
 
                     if confidence_values:
 
@@ -376,16 +596,25 @@ def upload_scrap():
                             / len(confidence_values)
                         )
 
+
+                # ---------------------------------------------
+                # UNCERTAIN
+                # ---------------------------------------------
+
                 else:
+
+                    detection_type = "uncertain"
 
                     detected_type = "Other/Unknown"
 
                     confidence_score = 0.0
 
+
     except Exception as e:
 
         print(
-            f"AI detection failed: {e}",
+            f"AI DETECTION FAILED: "
+            f"{type(e).__name__} - {e}",
             flush=True
         )
 
@@ -397,6 +626,7 @@ def upload_scrap():
 
         materials = []
 
+
     # =====================================================
     # SAVE DETECTED LABELS
     # =====================================================
@@ -404,6 +634,7 @@ def upload_scrap():
     detected_labels = json.dumps(
         materials
     )
+
 
     # =====================================================
     # CREATE SCRAP RECORD
@@ -436,9 +667,36 @@ def upload_scrap():
         notification_seen=True
     )
 
-    db.session.add(scrap)
 
-    db.session.commit()
+    # =====================================================
+    # SAVE TO DATABASE
+    # =====================================================
+
+    try:
+
+        db.session.add(scrap)
+
+        db.session.commit()
+
+    except Exception as e:
+
+        db.session.rollback()
+
+        print(
+            f"DATABASE ERROR: "
+            f"{type(e).__name__} - {e}",
+            flush=True
+        )
+
+        flash(
+            "Unable to save your scrap request.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("user.upload_scrap")
+        )
+
 
     # =====================================================
     # SUCCESS MESSAGE
@@ -468,6 +726,7 @@ def upload_scrap():
             "success"
         )
 
+
     return redirect(
         url_for("user.dashboard")
     )
@@ -490,9 +749,9 @@ def pickup():
             "user/pickup.html"
         )
 
+
     # =====================================================
     # GET FORM DATA
-    # Matches templates/user/pickup.html
     # =====================================================
 
     pickup_date = request.form.get(
@@ -515,6 +774,7 @@ def pickup():
         "longitude"
     )
 
+
     # =====================================================
     # VALIDATION
     # =====================================================
@@ -533,6 +793,7 @@ def pickup():
         return redirect(
             url_for("user.pickup")
         )
+
 
     # =====================================================
     # CREATE PICKUP REQUEST
@@ -557,16 +818,41 @@ def pickup():
         notification_seen=True
     )
 
-    db.session.add(
-        pickup_request
-    )
 
-    db.session.commit()
+    try:
+
+        db.session.add(
+            pickup_request
+        )
+
+        db.session.commit()
+
+
+    except Exception as e:
+
+        db.session.rollback()
+
+        print(
+            f"PICKUP DATABASE ERROR: "
+            f"{type(e).__name__} - {e}",
+            flush=True
+        )
+
+        flash(
+            "Unable to submit pickup request.",
+            "danger"
+        )
+
+        return redirect(
+            url_for("user.pickup")
+        )
+
 
     flash(
         "Pickup request submitted successfully!",
         "success"
     )
+
 
     return redirect(
         url_for("user.dashboard")
