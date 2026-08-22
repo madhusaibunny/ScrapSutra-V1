@@ -70,16 +70,12 @@ def verify_image(file):
 
     try:
 
-        # Move to beginning of file
         file.stream.seek(0)
 
-        # Open image
         image = Image.open(file.stream)
 
-        # Verify image is valid
         image.verify()
 
-        # Move back to beginning
         file.stream.seek(0)
 
         return True
@@ -136,7 +132,7 @@ def dashboard():
 
 
     # =====================================================
-    # CHECK SCRAP NOTIFICATION
+    # CHECK SCRAP NOTIFICATIONS
     # =====================================================
 
     unseen_scrap = (
@@ -179,11 +175,12 @@ def dashboard():
 
         db.session.commit()
 
-    else:
 
-        # =================================================
-        # CHECK PICKUP NOTIFICATION
-        # =================================================
+    # =====================================================
+    # CHECK PICKUP NOTIFICATIONS
+    # =====================================================
+
+    else:
 
         unseen_pickup = (
             PickupRequest.query
@@ -385,7 +382,6 @@ def upload_scrap():
         )
     )
 
-
     os.makedirs(
         upload_folder,
         exist_ok=True
@@ -434,7 +430,7 @@ def upload_scrap():
 
 
     # =====================================================
-    # DEFAULT DETECTION RESULT
+    # DEFAULT DETECTION VALUES
     # =====================================================
 
     detection_type = "uncertain"
@@ -462,6 +458,10 @@ def upload_scrap():
 
     try:
 
+        # ---------------------------------------------
+        # MANUAL CATEGORY SELECTED
+        # ---------------------------------------------
+
         if manual_category:
 
             detection_type = "single"
@@ -484,6 +484,10 @@ def upload_scrap():
             )
 
 
+        # ---------------------------------------------
+        # AI DETECTION
+        # ---------------------------------------------
+
         else:
 
             print(
@@ -491,16 +495,13 @@ def upload_scrap():
                 flush=True
             )
 
-
             from models.scrap_detector import (
                 detect_scrap_type
             )
 
-
             result = detect_scrap_type(
                 image_path
             )
-
 
             print(
                 f"AI DETECTION RESULT: {result}",
@@ -521,9 +522,9 @@ def upload_scrap():
                 )
 
 
-                # ---------------------------------------------
+                # =====================================
                 # SINGLE SCRAP
-                # ---------------------------------------------
+                # =====================================
 
                 if (
                     detection_type == "single"
@@ -552,9 +553,9 @@ def upload_scrap():
                         confidence_score = 0.0
 
 
-                # ---------------------------------------------
+                # =====================================
                 # MIXED SCRAP
-                # ---------------------------------------------
+                # =====================================
 
                 elif (
                     detection_type == "mixed"
@@ -564,7 +565,6 @@ def upload_scrap():
                     detected_type = "Mixed Scrap"
 
                     confidence_values = []
-
 
                     for material in materials:
 
@@ -597,9 +597,9 @@ def upload_scrap():
                         )
 
 
-                # ---------------------------------------------
+                # =====================================
                 # UNCERTAIN
-                # ---------------------------------------------
+                # =====================================
 
                 else:
 
@@ -608,6 +608,8 @@ def upload_scrap():
                     detected_type = "Other/Unknown"
 
                     confidence_score = 0.0
+
+                    materials = []
 
 
     except Exception as e:
@@ -644,9 +646,11 @@ def upload_scrap():
 
         user_id=current_user.id,
 
-        image_url=(
-            f"uploads/{unique_filename}"
-        ),
+        # IMPORTANT:
+        # Save ONLY the filename.
+        # Example:
+        # abc123_metal.webp
+        image_url=unique_filename,
 
         scrap_type=detected_type,
 
@@ -677,6 +681,15 @@ def upload_scrap():
         db.session.add(scrap)
 
         db.session.commit()
+
+        print(
+            f"SCRAP SAVED SUCCESSFULLY | "
+            f"ID: {scrap.id} | "
+            f"USER: {current_user.id} | "
+            f"TYPE: {detected_type}",
+            flush=True
+        )
+
 
     except Exception as e:
 
@@ -826,6 +839,12 @@ def pickup():
         )
 
         db.session.commit()
+
+        print(
+            f"PICKUP SAVED SUCCESSFULLY | "
+            f"ID: {pickup_request.id}",
+            flush=True
+        )
 
 
     except Exception as e:
