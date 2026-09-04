@@ -1,0 +1,934 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Scraps - ScrapSutra{% endblock %}
+
+{% block content %}
+
+<div class="container">
+
+    <div class="page-header">
+        <div>
+            <h1>Scrap Management</h1>
+            <p>Review, approve, or reject user scrap uploads.</p>
+        </div>
+
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+            ← Back to Dashboard
+        </a>
+    </div>
+
+
+    {% if scraps %}
+
+        <div class="scrap-list">
+
+            {% for scrap in scraps %}
+
+            <div class="scrap-card">
+
+                <!-- ========================= -->
+                <!-- IMAGE -->
+                <!-- ========================= -->
+
+                <div class="scrap-image-container">
+
+                    {% set image = (scrap.image_url or '')|trim %}
+
+                    {% if image %}
+
+                        {% if image.startswith('http://') or image.startswith('https://') %}
+
+                            <img
+                                src="{{ image }}"
+                                alt="Scrap Image"
+                                class="scrap-image"
+                                loading="lazy"
+                                onerror="this.style.display='none'; document.getElementById('image-error-{{ scrap.id }}').style.display='flex';"
+                            >
+
+                        {% elif image.startswith('/static/uploads/') %}
+
+                            <img
+                                src="{{ image }}"
+                                alt="Scrap Image"
+                                class="scrap-image"
+                                loading="lazy"
+                                onerror="this.style.display='none'; document.getElementById('image-error-{{ scrap.id }}').style.display='flex';"
+                            >
+
+                        {% elif image.startswith('static/uploads/') %}
+
+                            <img
+                                src="{{ url_for('static', filename=image.replace('static/', '', 1)) }}"
+                                alt="Scrap Image"
+                                class="scrap-image"
+                                loading="lazy"
+                                onerror="this.style.display='none'; document.getElementById('image-error-{{ scrap.id }}').style.display='flex';"
+                            >
+
+                        {% elif image.startswith('uploads/') %}
+
+                            <img
+                                src="{{ url_for('static', filename=image) }}"
+                                alt="Scrap Image"
+                                class="scrap-image"
+                                loading="lazy"
+                                onerror="this.style.display='none'; document.getElementById('image-error-{{ scrap.id }}').style.display='flex';"
+                            >
+
+                        {% else %}
+
+                            <img
+                                src="{{ url_for('static', filename='uploads/' ~ image) }}"
+                                alt="Scrap Image"
+                                class="scrap-image"
+                                loading="lazy"
+                                onerror="this.style.display='none'; document.getElementById('image-error-{{ scrap.id }}').style.display='flex';"
+                            >
+
+                        {% endif %}
+
+                        <div
+                            id="image-error-{{ scrap.id }}"
+                            class="image-not-found"
+                            style="display:none;"
+                        >
+                            <i class="fa-solid fa-image"></i>
+                            <span>Image unavailable</span>
+                        </div>
+
+                    {% else %}
+
+                        <div class="image-not-found">
+                            <i class="fa-solid fa-image"></i>
+                            <span>No image uploaded</span>
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+
+                <!-- ========================= -->
+                <!-- SCRAP DETAILS -->
+                <!-- ========================= -->
+
+                <div class="scrap-details">
+
+
+                    <div class="scrap-header">
+
+                        <div>
+
+                            <h2>
+                                Upload #{{ scrap.id }}
+                            </h2>
+
+                            <span class="user-badge">
+                                User #{{ scrap.user_id }}
+                            </span>
+
+                        </div>
+
+
+                        <div>
+
+                            {% if scrap.status == "pending" %}
+
+                                <span class="status-badge pending">
+                                    Pending
+                                </span>
+
+                            {% elif scrap.status == "approved" %}
+
+                                <span class="status-badge approved">
+                                    Approved
+                                </span>
+
+                            {% elif scrap.status == "rejected" %}
+
+                                <span class="status-badge rejected">
+                                    Rejected
+                                </span>
+
+                            {% else %}
+
+                                <span class="status-badge">
+                                    {{ scrap.status|capitalize }}
+                                </span>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="scrap-info-grid">
+
+
+                        <!-- Submitted Category -->
+
+                        <div class="info-item">
+
+                            <span class="info-label">
+                                Submitted Category:
+                            </span>
+
+                            <strong>
+                                {{ scrap.scrap_type or "Unknown" }}
+                            </strong>
+
+                        </div>
+
+
+
+                        <!-- AI Detection -->
+
+                        <div class="info-item">
+
+                            <span class="info-label">
+                                AI Detected:
+                            </span>
+
+                            <strong>
+
+                                {{ scrap.detected_type or scrap.scrap_type or "Unknown" }}
+
+                            </strong>
+
+                            {% if scrap.confidence_score is not none %}
+
+                                <span class="confidence">
+
+                                    ({{ "%.1f"|format(scrap.confidence_score * 100) }}% match)
+
+                                </span>
+
+                            {% endif %}
+
+                        </div>
+
+
+
+                        <!-- AI Labels -->
+
+                        <div class="info-item full-width">
+
+                            <span class="info-label">
+                                AI Labels:
+                            </span>
+
+                            <div class="ai-labels">
+
+                                {% if scrap.detected_labels %}
+
+                                    {% if scrap.detected_labels is string %}
+
+                                        {{ scrap.detected_labels }}
+
+                                    {% else %}
+
+                                        {% for label in scrap.detected_labels %}
+
+                                            <span class="label-badge">
+                                                {{ label }}
+                                            </span>
+
+                                        {% endfor %}
+
+                                    {% endif %}
+
+                                {% else %}
+
+                                    <span>
+                                        No AI labels available
+                                    </span>
+
+                                {% endif %}
+
+                            </div>
+
+                        </div>
+
+
+
+                        <!-- Estimated Rate -->
+
+                        <div class="info-item">
+
+                            <span class="info-label">
+                                Estimated Rate:
+                            </span>
+
+                            <strong class="price">
+
+                                ₹{{ scrap.estimated_price or 0 }}/kg
+
+                            </strong>
+
+                        </div>
+
+
+
+                        <!-- Submitted Date -->
+
+                        <div class="info-item">
+
+                            <span class="info-label">
+                                Submitted On:
+                            </span>
+
+                            <strong>
+
+                                {% if scrap.created_at %}
+
+                                    {{ scrap.created_at.strftime("%Y-%m-%d %H:%M:%S") }}
+
+                                {% else %}
+
+                                    N/A
+
+                                {% endif %}
+
+                            </strong>
+
+                        </div>
+
+
+                    </div>
+
+
+
+                    <!-- ========================= -->
+                    <!-- APPROVED RESULT -->
+                    <!-- ========================= -->
+
+                    {% if scrap.status == "approved" %}
+
+                    <div class="approval-result">
+
+                        <i class="fa-solid fa-circle-check"></i>
+
+                        <strong>
+
+                            Verified Weight:
+                            {{ scrap.weight or 0 }} kg
+
+                        </strong>
+
+                        <span>|</span>
+
+                        <strong>
+
+                            Points Issued:
+                            {{ scrap.points_earned or 0 }} pts
+
+                        </strong>
+
+                    </div>
+
+                    {% endif %}
+
+
+
+                    <!-- ========================= -->
+                    <!-- REJECTED RESULT -->
+                    <!-- ========================= -->
+
+                    {% if scrap.status == "rejected" %}
+
+                    <div class="rejected-result">
+
+                        <i class="fa-solid fa-circle-xmark"></i>
+
+                        This scrap upload was rejected.
+
+                    </div>
+
+                    {% endif %}
+
+
+
+                    <!-- ========================= -->
+                    <!-- ADMIN ACTIONS -->
+                    <!-- ========================= -->
+
+                    {% if scrap.status == "pending" %}
+
+                    <div class="admin-actions">
+
+
+                        <!-- APPROVE FORM -->
+
+                        <form
+                            action="{{ url_for('admin.approve_scrap', id=scrap.id) }}"
+                            method="POST"
+                            class="approve-form"
+                        >
+
+                            <input
+                                type="number"
+                                name="weight"
+                                min="0.1"
+                                step="0.1"
+                                placeholder="Verified Weight (kg)"
+                                required
+                            >
+
+                            <button
+                                type="submit"
+                                name="action"
+                                value="approve"
+                                class="btn btn-approve"
+                            >
+
+                                <i class="fa-solid fa-check"></i>
+
+                                Approve & Pay
+
+                            </button>
+
+                        </form>
+
+
+
+                        <!-- REJECT FORM -->
+
+                        <form
+                            action="{{ url_for('admin.approve_scrap', id=scrap.id) }}"
+                            method="POST"
+                            class="reject-form"
+                        >
+
+                            <input
+                                type="hidden"
+                                name="action"
+                                value="reject"
+                            >
+
+                            <button
+                                type="submit"
+                                class="btn btn-reject"
+                                onclick="return confirm('Are you sure you want to reject this scrap?');"
+                            >
+
+                                <i class="fa-solid fa-xmark"></i>
+
+                                Reject
+
+                            </button>
+
+                        </form>
+
+
+                    </div>
+
+                    {% endif %}
+
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+
+    {% else %}
+
+        <div class="empty-state">
+
+            <i class="fa-solid fa-recycle"></i>
+
+            <h2>No Scrap Uploads Yet</h2>
+
+            <p>
+                User scrap uploads will appear here.
+            </p>
+
+        </div>
+
+    {% endif %}
+
+
+</div>
+
+
+
+<style>
+
+
+.container {
+
+    max-width: 1450px;
+    margin: 0 auto;
+    padding: 30px;
+
+}
+
+
+.page-header {
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+
+}
+
+
+.page-header h1 {
+
+    margin: 0;
+    font-size: 32px;
+
+}
+
+
+.page-header p {
+
+    opacity: 0.7;
+
+}
+
+
+.scrap-list {
+
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+
+}
+
+
+.scrap-card {
+
+    display: grid;
+    grid-template-columns: 420px 1fr;
+
+    background: #143b32;
+
+    border: 1px solid rgba(255,255,255,0.12);
+
+    border-radius: 18px;
+
+    overflow: hidden;
+
+}
+
+
+.scrap-image-container {
+
+    background: #20252b;
+
+    min-height: 350px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+}
+
+
+.scrap-image {
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    max-height: 500px;
+
+}
+
+
+.image-not-found {
+
+    width: 100%;
+    height: 100%;
+
+    min-height: 350px;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-direction: column;
+
+    gap: 12px;
+
+    color: #9ca3af;
+
+}
+
+
+.image-not-found i {
+
+    font-size: 50px;
+
+}
+
+
+.scrap-details {
+
+    padding: 30px;
+
+}
+
+
+.scrap-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin-bottom: 30px;
+
+}
+
+
+.scrap-header h2 {
+
+    margin: 0;
+
+}
+
+
+.user-badge {
+
+    display: inline-block;
+
+    margin-top: 8px;
+
+    padding: 6px 12px;
+
+    background: #64748b;
+
+    border-radius: 6px;
+
+    color: white;
+
+}
+
+
+.status-badge {
+
+    padding: 8px 15px;
+
+    border-radius: 20px;
+
+    font-weight: bold;
+
+}
+
+
+.pending {
+
+    background: #facc15;
+
+    color: #111;
+
+}
+
+
+.approved {
+
+    background: #bbf7d0;
+
+    color: #166534;
+
+}
+
+
+.rejected {
+
+    background: #fecaca;
+
+    color: #991b1b;
+
+}
+
+
+.scrap-info-grid {
+
+    display: grid;
+
+    grid-template-columns: repeat(2, 1fr);
+
+    gap: 28px;
+
+}
+
+
+.info-item {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+
+}
+
+
+.full-width {
+
+    grid-column: span 2;
+
+}
+
+
+.info-label {
+
+    font-weight: bold;
+
+    opacity: 0.7;
+
+}
+
+
+.price {
+
+    color: #22c55e;
+
+}
+
+
+.confidence {
+
+    margin-left: 5px;
+
+    opacity: 0.6;
+
+}
+
+
+.ai-labels {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 8px;
+
+}
+
+
+.label-badge {
+
+    padding: 5px 10px;
+
+    background: #1f5c4c;
+
+    border-radius: 15px;
+
+}
+
+
+.admin-actions {
+
+    margin-top: 35px;
+
+    padding-top: 25px;
+
+    border-top: 1px solid rgba(255,255,255,0.1);
+
+    display: flex;
+
+    gap: 15px;
+
+}
+
+
+.approve-form {
+
+    display: flex;
+
+    flex: 1;
+
+    gap: 10px;
+
+}
+
+
+.approve-form input {
+
+    width: 280px;
+
+    padding: 14px;
+
+    border-radius: 10px;
+
+    border: 1px solid #2f6b5b;
+
+    background: #173f35;
+
+    color: white;
+
+}
+
+
+.btn {
+
+    padding: 13px 24px;
+
+    border-radius: 10px;
+
+    border: none;
+
+    cursor: pointer;
+
+    font-weight: bold;
+
+    text-decoration: none;
+
+}
+
+
+.btn-approve {
+
+    flex: 1;
+
+    background: #2d8a61;
+
+    color: white;
+
+}
+
+
+.btn-reject {
+
+    background: transparent;
+
+    border: 1px solid #ef4444;
+
+    color: #ef4444;
+
+    min-width: 220px;
+
+}
+
+
+.btn-secondary {
+
+    background: #374151;
+
+    color: white;
+
+}
+
+
+.approval-result {
+
+    margin-top: 25px;
+
+    padding: 18px;
+
+    background: rgba(34,197,94,0.1);
+
+    color: #4ade80;
+
+    border-radius: 10px;
+
+    display: flex;
+
+    gap: 12px;
+
+    align-items: center;
+
+}
+
+
+.rejected-result {
+
+    margin-top: 25px;
+
+    padding: 18px;
+
+    background: rgba(239,68,68,0.1);
+
+    color: #f87171;
+
+    border-radius: 10px;
+
+}
+
+
+.empty-state {
+
+    text-align: center;
+
+    padding: 100px 20px;
+
+}
+
+
+.empty-state i {
+
+    font-size: 70px;
+
+    opacity: 0.4;
+
+}
+
+
+@media (max-width: 900px) {
+
+    .scrap-card {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .scrap-info-grid {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .full-width {
+
+        grid-column: span 1;
+
+    }
+
+
+    .admin-actions {
+
+        flex-direction: column;
+
+    }
+
+
+    .approve-form {
+
+        flex-direction: column;
+
+    }
+
+
+    .approve-form input {
+
+        width: auto;
+
+    }
+
+
+    .btn-reject {
+
+        width: 100%;
+
+    }
+
+}
+
+
+</style>
+
+{% endblock %}

@@ -1,0 +1,146 @@
+<!-- Notification Popup -->
+
+{% if notification %}
+
+<div class="modal fade"
+     id="notificationModal"
+     tabindex="-1"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+
+        <div class="modal-content bg-dark text-light border border-secondary">
+
+            <!-- Header -->
+
+            <div class="modal-header border-secondary">
+
+                <h5 class="modal-title fw-bold">
+
+                    <i class="fa-solid fa-bell text-success me-2"></i>
+
+                    {{ notification.title }}
+
+                </h5>
+
+                <button
+                    type="button"
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    aria-label="Close">
+                </button>
+
+            </div>
+
+
+            <!-- Body -->
+
+            <div class="modal-body text-center py-4">
+
+                {% if notification.status == 'error' %}
+
+                    <i class="fa-solid fa-circle-xmark text-danger display-4 mb-3"></i>
+
+                {% else %}
+
+                    <i class="fa-solid fa-circle-check text-success display-4 mb-3"></i>
+
+                {% endif %}
+
+
+                <h4 class="fw-bold">
+
+                    {{ notification.title }}
+
+                </h4>
+
+
+                <p class="text-muted mb-0">
+
+                    {{ notification.message }}
+
+                </p>
+
+            </div>
+
+
+            <!-- Footer -->
+
+            <div class="modal-footer border-secondary">
+
+                <button
+                    type="button"
+                    class="btn btn-primary-custom w-100"
+                    data-bs-dismiss="modal">
+
+                    Okay
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        // Set progress bar widths
+
+        const progressBars =
+            document.querySelectorAll(
+                '.progress-bar[data-confidence]'
+            );
+
+        progressBars.forEach(
+            function (bar) {
+
+                const confidence =
+                    parseFloat(
+                        bar.getAttribute(
+                            'data-confidence'
+                        )
+                    );
+
+                bar.style.width =
+                    confidence + '%';
+
+            }
+        );
+
+
+        // Show notification popup
+
+        const notificationElement =
+            document.getElementById(
+                "notificationModal"
+            );
+
+
+        if (
+            notificationElement &&
+            typeof bootstrap !== "undefined"
+        ) {
+
+            const notificationModal =
+                new bootstrap.Modal(
+                    notificationElement
+                );
+
+            notificationModal.show();
+
+        }
+
+    }
+);
+
+</script>
+
+{% endif %}

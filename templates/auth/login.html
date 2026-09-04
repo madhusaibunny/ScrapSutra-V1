@@ -1,0 +1,340 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="glass-card mx-auto" style="max-width: 450px; margin-top: 5rem;">
+
+    <h2 class="text-center text-success mb-4 fw-bold">
+        Login
+    </h2>
+
+    <!-- NORMAL LOGIN -->
+
+    <form method="POST">
+
+        <div class="mb-3">
+
+            <label class="form-label text-light">
+                Email
+            </label>
+
+            <input
+                type="email"
+                name="email"
+                class="form-control form-control-glass"
+                required
+            >
+
+        </div>
+
+
+        <div class="mb-4">
+
+            <label class="form-label text-light">
+                Password
+            </label>
+
+            <input
+                type="password"
+                name="password"
+                class="form-control form-control-glass"
+                required
+            >
+
+        </div>
+
+
+        <button
+            type="submit"
+            class="btn btn-primary-custom w-100 py-2 fs-5"
+        >
+            Login
+        </button>
+
+    </form>
+
+
+    <div class="text-center text-muted my-4">
+        or
+    </div>
+
+
+    <!-- GOOGLE LOGIN -->
+
+    <button
+        type="button"
+        id="googleLoginBtn"
+        class="btn btn-light w-100 py-2 d-flex align-items-center justify-content-center text-secondary border"
+    >
+
+        <img
+            src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+            style="width: 18px; height: 18px;"
+            class="me-2"
+            alt="Google Logo"
+        >
+
+        Continue with Google
+
+    </button>
+
+
+    <p class="mt-4 text-center text-light">
+
+        Don't have an account?
+
+        <a
+            href="{{ url_for('auth.signup') }}"
+            class="text-success text-decoration-none fw-bold"
+        >
+            Sign Up
+        </a>
+
+    </p>
+
+</div>
+
+
+<!-- FIREBASE GOOGLE AUTH -->
+
+<script type="module">
+
+    import {
+        initializeApp
+    } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+
+
+    import {
+        getAuth,
+        GoogleAuthProvider,
+        signInWithPopup
+    } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+
+    /*
+    ==========================================
+    FIREBASE CONFIG
+    ==========================================
+    */
+
+    const firebaseConfig = {
+
+        apiKey: "AIzaSyAaoPpjJibztwZiT96L5IbvsVOVcB-VMHY",
+
+        authDomain: "ss-1-37011.firebaseapp.com",
+
+        projectId: "ss-1-37011",
+
+        storageBucket: "ss-1-37011.firebasestorage.app",
+
+        messagingSenderId: "766926888949",
+
+        appId: "1:766926888949:web:3aca167a8aac6469f60abc"
+
+    };
+
+
+    /*
+    ==========================================
+    INITIALIZE FIREBASE
+    ==========================================
+    */
+
+    const app = initializeApp(firebaseConfig);
+
+    const auth = getAuth(app);
+
+    const provider = new GoogleAuthProvider();
+
+
+    /*
+    ==========================================
+    GOOGLE LOGIN
+    ==========================================
+    */
+
+    document
+        .getElementById("googleLoginBtn")
+        .addEventListener(
+            "click",
+            async () => {
+
+                const btn =
+                    document.getElementById(
+                        "googleLoginBtn"
+                    );
+
+
+                try {
+
+                    /*
+                    ==========================================
+                    LOADING BUTTON
+                    ==========================================
+                    */
+
+                    btn.disabled = true;
+
+                    btn.innerHTML =
+                        `
+                        <span
+                            class="spinner-border
+                                   spinner-border-sm
+                                   me-2"
+                        ></span>
+
+                        Connecting...
+                        `;
+
+
+                    /*
+                    ==========================================
+                    GOOGLE SIGN IN
+                    ==========================================
+                    */
+
+                    const result =
+                        await signInWithPopup(
+                            auth,
+                            provider
+                        );
+
+
+                    const user =
+                        result.user;
+
+
+                    /*
+                    ==========================================
+                    GET FIREBASE ID TOKEN
+                    ==========================================
+                    */
+
+                    const firebaseToken =
+                        await user.getIdToken();
+
+
+                    /*
+                    ==========================================
+                    SEND TOKEN TO FLASK
+                    ==========================================
+                    */
+
+                    const response =
+                        await fetch(
+                            "/auth/google-login",
+                            {
+
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body:
+                                    JSON.stringify(
+                                        {
+                                            id_token:
+                                                firebaseToken
+                                        }
+                                    )
+
+                            }
+                        );
+
+
+                    const data =
+                        await response.json();
+
+
+                    /*
+                    ==========================================
+                    LOGIN SUCCESS
+                    ==========================================
+                    */
+
+                    if (
+                        data.success
+                    ) {
+
+                        window.location.href =
+                            data.redirect
+                            ||
+                            "/user/dashboard";
+
+                    }
+
+                    else {
+
+                        alert(
+                            "Google Login Failed: "
+                            +
+                            (
+                                data.error
+                                ||
+                                "Unknown error"
+                            )
+                        );
+
+                    }
+
+                }
+
+
+                catch (
+                    error
+                ) {
+
+                    console.error(
+                        "Google Login Error:",
+                        error
+                    );
+
+
+                    if (
+                        error.code
+                        !==
+                        "auth/popup-closed-by-user"
+                    ) {
+
+                        alert(
+                            "Google Login Error: "
+                            +
+                            error.message
+                        );
+
+                    }
+
+                }
+
+
+                finally {
+
+                    /*
+                    ==========================================
+                    RESET BUTTON
+                    ==========================================
+                    */
+
+                    btn.disabled = false;
+
+                    btn.innerHTML =
+                        `
+                        <img
+                            src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                            style="width: 18px; height: 18px;"
+                            class="me-2"
+                            alt="Google Logo"
+                        >
+
+                        Continue with Google
+                        `;
+
+                }
+
+            }
+        );
+
+</script>
+
+{% endblock %}

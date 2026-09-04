@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="glass-card mx-auto text-center" style="max-width: 900px; margin-top: 3rem; margin-bottom: 3rem;">
+    <h2 class="text-success mb-3 fw-bold display-5">Scrap Pricing</h2>
+    <p class="text-light opacity-75 mb-5 fs-5">Check the current value of your recyclable materials below. Prices are per kilogram.</p>
+    
+    <div class="row g-4 justify-content-center">
+        {% for rate in rates %}
+        <div class="col-12 col-sm-6 col-md-4">
+            <div class="p-4 rounded-4" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05);">
+                <i class="fa-solid {{ rate.icon }} display-3 mb-3" style="color: {{ rate.color }};"></i>
+                <h4 class="fw-bold">{{ rate.category }}</h4>
+                <div class="display-6 text-success fw-bold mt-2">₹{{ rate.price }}<span class="fs-6 text-muted">/kg</span></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mt-5">
+        <a href="{{ url_for('user.upload_scrap') if current_user.is_authenticated else url_for('auth.signup') }}" class="btn btn-primary-custom btn-lg px-5 py-3 rounded-pill">Start Earning Now</a>
+    </div>
+</div>
+{% endblock %}
